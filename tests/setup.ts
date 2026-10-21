@@ -1,9 +1,17 @@
 import '@testing-library/jest-dom/vitest';
 
 import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, vi } from 'vitest';
+
+import { server } from './msw/server';
+
+// Any request without a matching handler fails the test instead of hitting the network.
+// (MSW 3 renamed v2's `onUnhandledRequest` to `onUnhandledFrame`.)
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
+afterAll(() => server.close());
 
 afterEach(() => {
+    server.resetHandlers();
     cleanup();
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');

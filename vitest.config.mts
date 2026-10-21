@@ -9,5 +9,10 @@ export default defineConfig({
         setupFiles: ['./tests/setup.ts'],
         include: ['tests/unit/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
         css: false,
+        // src/lib/env.ts validates these on import (same values as .env.example).
+        env: {
+            NEXT_PUBLIC_API_URL: 'http://localhost:3000',
+            API_URL: 'http://localhost:3000',
+        },
     },
 });

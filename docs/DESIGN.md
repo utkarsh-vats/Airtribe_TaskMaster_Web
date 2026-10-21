@@ -156,11 +156,11 @@ A dev-only `/dev/ui` page renders every component in both themes (the prototype'
 ## 7. Data layer
 
 - `src/lib/api/schema.d.ts` — generated: `npm run api:types` runs openapi-typescript against `API_SPEC_URL` (default `http://localhost:3000/openapi.json`). The file is committed; regenerate when the API changes.
-- `src/lib/api/client.ts` — openapi-fetch client with `baseUrl = NEXT_PUBLIC_API_URL + '/api/v1'` and a middleware that adds the bearer token and runs the §3 refresh-and-retry logic.
+- `src/lib/api/client.ts` — openapi-fetch client with `baseUrl = NEXT_PUBLIC_API_URL` (the spec's paths already include `/api/v1`) and a middleware that adds the bearer token and runs the §3 refresh-and-retry logic. `unwrap()` / `unwrapPage()` return the `{ data }` payload (or `{ items, meta }`) and throw `ApiError`.
 - `ApiError` — `{ status, code, message, details, requestId }` parsed from the error envelope.
 - `src/lib/query/keys.ts` — one key factory: `projects.list()`, `projects.detail(id)`, `tasks.list(projectId, filters)`, `tasks.detail(projectId, taskId)`, `tasks.mine(filters)`, `comments.list(projectId, taskId|'none')`, `attachments.list(…)`, `members.list(projectId)`, `invitations.project(projectId)`, `invitations.mine()`, `notifications.list(filters)`, `me()`.
 - One hook file per feature (`src/features/<feature>/api.ts`) exposing `useXQuery` / `useXMutation`; mutations invalidate the affected keys.
-- **Optimistic updates** for task status/priority/assignee changes and board moves; roll back on error. A 409 rolls back and shows "Someone else changed this task — refreshed", then refetches.
+- **Optimistic updates** for task status/priority/assignee changes and board moves; roll back on error. The API's 409 on PATCH task only detects a concurrent *status* change; every other field is last-write-wins (there's no version field or `If-Match`). So after any 409 the UI rolls back, refetches the task and says "This task's status changed — refreshed"; it doesn't claim to detect conflicts on other fields.
 - **Downloads** need the `Authorization` header, so they `fetch` the file as a Blob and trigger a download through an object URL (files are ≤ 10 MB).
 - **Uploads** use `XMLHttpRequest` for a progress bar; same auth header and error mapping.
 
@@ -172,7 +172,7 @@ A dev-only `/dev/ui` page renders every component in both themes (the prototype'
 | other 401 | sign out → `/login?next=` |
 | 403 | toast "You don't have permission to do that"; controls are hidden/disabled up front using `myRole` |
 | 404 on a project route | project not-found screen |
-| 409 | toast with the API message; task conflicts also refetch |
+| 409 | toast with the API message; on a task, roll back and refetch (status conflicts only — see above) |
 | 410 `INVITATION_EXPIRED` | toast "This invitation has expired", remove it from the inbox |
 | 413 / 415 | inline under the upload area ("Max 10 MB" / "That file type isn't allowed") |
 | 422 | `details[].path` → field errors; anything unmatched → toast |
