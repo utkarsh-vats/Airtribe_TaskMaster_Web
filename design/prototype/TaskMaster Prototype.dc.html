@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-648a929a-00ea-4289-99e1-9b5cf1254b1b/styles.css">
+<link rel="stylesheet" href="taskmaster-tokens.css">
+<script src="_ds/modernist-648a929a-00ea-4289-99e1-9b5cf1254b1b/_ds_bundle.js"></script>
+<style>body{margin:0}.btn,.seg-opt{white-space:nowrap;flex:none}.seg{flex:none}a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="min-height:100vh;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);display:flex;flex-direction:column">
+
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3) var(--space-6);padding:var(--space-2) var(--space-4);background:var(--color-neutral-900);color:var(--color-neutral-100);font-size:12px">
+  <div style="font-weight:800;letter-spacing:0.1em;text-transform:uppercase">Prototype</div>
+  <sc-for list="{{ demoSegs }}" as="seg" hint-placeholder-count="3">
+    <div style="display:flex;align-items:center;gap:var(--space-2)">
+      <div style="opacity:0.7">{{ seg.label }}</div>
+      <div class="seg" style="border-color:var(--color-neutral-600)">
+        <sc-for list="{{ seg.options }}" as="o" hint-placeholder-count="3">
+          <label class="seg-opt" style="padding:3px 10px;font-size:12px"><input type="radio" name="{{ seg.name }}" checked="{{ o.checked }}" onChange="{{ o.onChange }}">{{ o.label }}</label>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+  <div style="display:flex;gap:var(--space-2);margin-left:auto">
+    <button class="btn" style="color:inherit;padding:3px 10px;font-size:12px;border:1px solid var(--color-neutral-600)" onClick="{{ goTokens }}">Tokens &amp; components</button>
+    <button class="btn" style="color:inherit;padding:3px 10px;font-size:12px;border:1px solid var(--color-neutral-600)" onClick="{{ toggleAuth }}">{{ authToggleLabel }}</button>
+  </div>
+</div>
+
+<sc-if value="{{ notAuthed }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));border-bottom:2px solid var(--color-divider)">
+    <div style="background:var(--color-accent);color:var(--color-bg);padding:var(--space-8);display:flex;flex-direction:column;justify-content:space-between;gap:var(--space-8);min-height:280px">
+      <div style="font-weight:800;font-size:18px">TaskMaster</div>
+      <div>
+        <div style="font-weight:800;font-size:clamp(44px,7vw,88px);line-height:0.95;letter-spacing:-0.03em">Tasks,<br>in order.</div>
+        <p style="margin-top:var(--space-4);max-width:34ch;font-size:16px">Projects, boards and teammates in one place. Nothing extra.</p>
+      </div>
+    </div>
+    <div style="padding:var(--space-8);display:flex;flex-direction:column;justify-content:center">
+      <div style="width:100%;max-width:400px;display:flex;flex-direction:column;gap:var(--space-4)">
+        <div class="seg" style="align-self:flex-start">
+          <label class="seg-opt"><input type="radio" name="authmode" checked="{{ authIsLogin }}" onChange="{{ setLogin }}">Sign in</label>
+          <label class="seg-opt"><input type="radio" name="authmode" checked="{{ authIsRegister }}" onChange="{{ setRegister }}">Create account</label>
+        </div>
+        <h2 style="margin:0">{{ authTitle }}</h2>
+        <form onSubmit="{{ onAuthSubmit }}" style="display:flex;flex-direction:column;gap:var(--space-3)">
+          <sc-if value="{{ authIsRegister }}" hint-placeholder-val="{{ false }}">
+            <div class="field"><label>Full name</label><input class="input" placeholder="Mara Okafor"></div>
+          </sc-if>
+          <div class="field"><label>Email</label><input class="input" type="email" placeholder="you@company.com" value="mara@taskmaster.app" onChange="{{ noop }}"></div>
+          <div class="field"><label>Password</label><input class="input" type="password" value="password123" onChange="{{ noop }}"></div>
+          <sc-if value="{{ authIsRegister }}" hint-placeholder-val="{{ false }}">
+            <div class="text-muted" style="font-size:12px">At least 8 characters, one number.</div>
+          </sc-if>
+          <button class="btn btn-primary btn-block" type="submit" style="padding:12px 14px;justify-content:space-between">{{ authCta }}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></button>
+        </form>
+        <sc-if value="{{ authIsLogin }}" hint-placeholder-val="{{ true }}">
+          <button class="btn btn-ghost" style="align-self:flex-start">Forgot password?</button>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ authed }}" hint-placeholder-val="{{ true }}">
+  <header class="nav" style="position:relative;gap:var(--space-3)">
+    <div class="nav-brand" style="display:flex;align-items:center;gap:var(--space-2)"><div style="width:14px;height:14px;background:var(--color-accent)"></div>TaskMaster</div>
+    <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+      <div style="position:relative;width:260px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style="position:absolute;left:10px;top:11px;opacity:0.6"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        <input class="input" placeholder="Search tasks" value="{{ q }}" onChange="{{ onSearch }}" style="padding-left:30px">
+      </div>
+    </sc-if>
+    <button role="switch" aria-checked="{{ isDarkTheme }}" aria-label="Dark theme" title="{{ themeTitle }}" onClick="{{ toggleTheme }}" style="position:relative;flex:none;width:60px;height:30px;padding:0;border:1px solid var(--color-divider);border-radius:999px;background:var(--color-surface);color:var(--color-text);cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding-inline:8px" style-hover="border-color:var(--color-accent)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style="opacity:0.55"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style="opacity:0.55"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+      <div style="position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:999px;background:var(--color-accent);transform:translateX({{ knobX }});transition:transform 180ms ease"></div>
+    </button>
+    <button class="btn btn-icon btn-secondary" aria-label="Notifications" onClick="{{ toggleNotif }}" style="position:relative">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.268 21a2 2 0 0 0 3.464 0"></path><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"></path></svg>
+      <sc-if value="{{ hasUnread }}" hint-placeholder-val="{{ true }}">
+        <div style="position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;background:var(--color-accent);color:var(--color-bg);font-size:11px;font-weight:800;display:grid;place-items:center">{{ unreadCount }}</div>
+      </sc-if>
+    </button>
+    <button class="btn btn-secondary" onClick="{{ goProfile }}" style="padding:4px 10px 4px 4px;gap:var(--space-2)">
+      <div style="width:28px;height:28px;display:grid;place-items:center;background:var(--color-accent-200);color:var(--color-accent-900);font-size:11px;font-weight:800">MO</div>
+      <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><div style="font-weight:600">Mara</div></sc-if>
+    </button>
+
+    <sc-if value="{{ notifOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;top:calc(100% + 2px);right:var(--space-4);width:min(380px,calc(100vw - 32px));background:var(--color-bg);box-shadow:var(--shadow-lg);border:2px solid var(--color-divider);z-index:30">
+        <div style="display:flex;align-items:center;padding:var(--space-3) var(--space-4);border-bottom:2px solid var(--color-divider)">
+          <div style="font-weight:800;font-size:16px;margin-right:auto">Notifications</div>
+          <button class="btn btn-ghost" onClick="{{ markAllRead }}" disabled="{{ noUnread }}">Mark all read</button>
+        </div>
+        <sc-for list="{{ notifs }}" as="n" hint-placeholder-count="4">
+          <button onClick="{{ n.onClick }}" style="display:grid;grid-template-columns:10px 1fr;gap:var(--space-3);width:100%;text-align:left;padding:var(--space-3) var(--space-4);background:transparent;border:0;border-bottom:1px solid var(--color-divider);color:inherit;font:inherit;cursor:pointer" style-hover="background:color-mix(in srgb,var(--color-text) 5%,transparent)">
+            <div style="width:8px;height:8px;margin-top:7px;background:{{ n.dot }}"></div>
+            <div><div style="font-size:14px;font-weight:{{ n.weight }}">{{ n.text }}</div><div class="text-muted" style="font-size:12px">{{ n.at }}</div></div>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+  </header>
+
+  <div style="flex:1;display:flex;min-height:0">
+    <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+      <aside style="width:240px;flex:none;border-right:2px solid var(--color-divider);padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-1)">
+        <h6 class="text-muted" style="margin:0 0 var(--space-2)">Projects</h6>
+        <sc-for list="{{ projectItems }}" as="p" hint-placeholder-count="3">
+          <button onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:var(--space-2);width:100%;padding:8px 10px;border:0;background:{{ p.bg }};color:{{ p.fg }};font:inherit;font-size:14px;font-weight:{{ p.weight }};text-align:left;cursor:pointer" style-hover="background:color-mix(in srgb,var(--color-text) 7%,transparent)">
+            <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.name }}</div>
+            <div style="font-size:12px;opacity:0.7">{{ p.count }}</div>
+          </button>
+        </sc-for>
+        <button class="btn btn-ghost" onClick="{{ addProject }}" style="justify-content:flex-start;margin-top:var(--space-2)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>New project</button>
+      </aside>
+    </sc-if>
+
+    <main style="flex:1;min-width:0;padding:var(--space-6) var(--space-6) var(--space-8);display:flex;flex-direction:column;gap:var(--space-4)">
+      <sc-if value="{{ showProjectHeader }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+          <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+            <div class="card-kicker" style="color:var(--color-accent-700)">Project</div>
+            <div class="tag tag-accent">{{ roleLabel }}</div>
+          </div>
+          <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+            <select class="input" value="{{ projectId }}" onChange="{{ onProjectSelect }}" style="font-weight:800;font-size:18px">
+              <sc-for list="{{ projectItems }}" as="p" hint-placeholder-count="3"><option value="{{ p.id }}">{{ p.name }}</option></sc-for>
+            </select>
+          </sc-if>
+          <sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><h2 style="margin:0">{{ proj.name }}</h2></sc-if>
+          <p class="text-muted" style="margin:0;max-width:70ch;text-wrap:pretty">{{ proj.description }}</p>
+          <div style="display:flex;gap:var(--space-4);border-bottom:2px solid var(--color-divider);margin-top:var(--space-3);overflow-x:auto;overflow-y:hidden;scrollbar-width:none">
+            <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="4">
+              <button onClick="{{ tab.onClick }}" style="position:relative;padding:8px 2px 10px;background:transparent;border:0;font:inherit;font-weight:{{ tab.weight }};font-size:14px;color:inherit;cursor:pointer;white-space:nowrap" style-hover="color:var(--color-accent-700)">
+                {{ tab.label }}
+                <sc-if value="{{ tab.active }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--color-accent)"></div></sc-if>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isTasks }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3)">
+          <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+            <div class="seg">
+              <sc-for list="{{ filterOpts }}" as="f" hint-placeholder-count="4">
+                <label class="seg-opt"><input type="radio" name="filter" checked="{{ f.checked }}" onChange="{{ f.onChange }}">{{ f.label }}<span style="opacity:0.65">{{ f.count }}</span></label>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+            <input class="input" placeholder="Search tasks" value="{{ q }}" onChange="{{ onSearch }}" style="flex:1;min-width:160px">
+          </sc-if>
+          <button class="btn btn-primary" onClick="{{ openNew }}" style="margin-left:auto"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>New task</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ listEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="border-top:2px solid var(--color-divider);border-bottom:2px solid var(--color-divider);padding:var(--space-8) 0;display:flex;flex-direction:column;gap:var(--space-2);align-items:flex-start">
+          <h4 style="margin:0">No tasks match</h4>
+          <p class="text-muted" style="margin:0">Clear the search or pick another status.</p>
+          <button class="btn btn-secondary" onClick="{{ clearFilters }}">Clear filters</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showA }}" hint-placeholder-val="{{ true }}">
+        <div style="border-top:2px solid var(--color-divider)">
+          <sc-for list="{{ rows }}" as="t" hint-placeholder-count="6">
+            <div onClick="{{ t.onOpen }}" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--space-2) var(--space-4);padding:var(--space-4) var(--space-2);border-bottom:1px solid var(--color-divider);cursor:pointer" style-hover="background:color-mix(in srgb,var(--color-text) 4%,transparent)">
+              <div style="min-width:0;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;align-items:center;gap:var(--space-2)"><div class="text-muted" style="font-size:12px;font-variant-numeric:tabular-nums">{{ t.key }}</div><div style="width:8px;height:8px;background:{{ t.prioColor }}"></div><div class="text-muted" style="font-size:12px">{{ t.prioLabel }}</div></div>
+                <div style="font-weight:600;font-size:16px">{{ t.title }}</div>
+                <div class="text-muted" style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.description }}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:var(--space-2)">
+                <div class="{{ t.tagClass }}">{{ t.statusLabel }}</div>
+                <div style="display:flex;align-items:center;gap:var(--space-2);font-size:12px">
+                  <div style="color:{{ t.dueColor }};font-weight:{{ t.dueWeight }}">{{ t.dueLabel }}</div>
+                  <div title="{{ t.assigneeName }}" style="width:24px;height:24px;display:grid;place-items:center;background:var(--color-neutral-300);color:var(--color-neutral-900);font-size:10px;font-weight:800">{{ t.initials }}</div>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showB }}" hint-placeholder-val="{{ false }}">
+        <div style="overflow-x:auto">
+          <table class="table" style="min-width:640px">
+            <thead><tr><th style="width:80px">ID</th><th>Task</th><th style="width:120px">Status</th><th style="width:100px">Priority</th><th style="width:150px">Assignee</th><th style="width:90px">Due</th></tr></thead>
+            <tbody>
+              <sc-for list="{{ rows }}" as="t" hint-placeholder-count="8">
+                <tr onClick="{{ t.onOpen }}" style="cursor:pointer">
+                  <td class="text-muted" style="font-size:12px;font-variant-numeric:tabular-nums">{{ t.key }}</td>
+                  <td style="font-weight:600">{{ t.title }}</td>
+                  <td><div class="{{ t.tagClass }}">{{ t.statusLabel }}</div></td>
+                  <td><div style="display:flex;align-items:center;gap:6px;font-size:13px"><div style="width:8px;height:8px;background:{{ t.prioColor }}"></div>{{ t.prioLabel }}</div></td>
+                  <td><div style="display:flex;align-items:center;gap:6px;font-size:13px"><div style="width:22px;height:22px;display:grid;place-items:center;background:var(--color-neutral-300);color:var(--color-neutral-900);font-size:10px;font-weight:800">{{ t.initials }}</div>{{ t.assigneeName }}</div></td>
+                  <td style="font-size:13px;color:{{ t.dueColor }};font-weight:{{ t.dueWeight }}">{{ t.dueLabel }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showC }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:var(--space-6)">
+          <sc-for list="{{ listGroups }}" as="g" hint-placeholder-count="3">
+            <div>
+              <div style="display:flex;align-items:baseline;gap:var(--space-2);padding-bottom:var(--space-2);border-bottom:2px solid var(--color-divider)">
+                <h6 style="margin:0">{{ g.label }}</h6><div class="text-muted" style="font-size:12px">{{ g.count }}</div>
+              </div>
+              <sc-for list="{{ g.tasks }}" as="t" hint-placeholder-count="3">
+                <div onClick="{{ t.onOpen }}" style="display:flex;align-items:center;gap:var(--space-3);padding:8px var(--space-2);border-bottom:1px solid var(--color-divider);cursor:pointer;font-size:14px" style-hover="background:color-mix(in srgb,var(--color-text) 4%,transparent)">
+                  <div style="width:8px;height:8px;flex:none;background:{{ t.prioColor }}"></div>
+                  <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.title }}</div>
+                  <div style="font-size:12px;color:{{ t.dueColor }};font-weight:{{ t.dueWeight }}">{{ t.dueLabel }}</div>
+                  <div style="width:22px;height:22px;flex:none;display:grid;place-items:center;background:var(--color-neutral-300);color:var(--color-neutral-900);font-size:10px;font-weight:800">{{ t.initials }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--space-4);align-items:start">
+          <sc-for list="{{ columns }}" as="c" hint-placeholder-count="3">
+            <div onDragOver="{{ c.onDragOver }}" onDrop="{{ c.onDrop }}" style="display:flex;flex-direction:column;gap:var(--space-2);min-height:200px">
+              <div style="display:flex;align-items:baseline;gap:var(--space-2);padding-bottom:var(--space-2);border-bottom:2px solid var(--color-divider)">
+                <h6 style="margin:0">{{ c.label }}</h6><div class="text-muted" style="font-size:12px">{{ c.count }}</div>
+              </div>
+              <sc-for list="{{ c.tasks }}" as="t" hint-placeholder-count="3">
+                <div class="card elev-sm" draggable="true" onDragStart="{{ t.onDragStart }}" onClick="{{ t.onOpen }}" style="cursor:grab" style-hover="box-shadow:var(--shadow-md)">
+                  <div style="display:flex;align-items:center;gap:var(--space-2)"><div class="text-muted" style="font-size:11px">{{ t.key }}</div><div style="width:8px;height:8px;background:{{ t.prioColor }}"></div><div class="text-muted" style="font-size:11px">{{ t.prioLabel }}</div></div>
+                  <div class="card-title" style="font-size:15px">{{ t.title }}</div>
+                  <div class="card-meta" style="justify-content:space-between">
+                    <div style="color:{{ t.dueColor }};font-weight:{{ t.dueWeight }}">{{ t.dueLabel }}</div>
+                    <div style="width:22px;height:22px;display:grid;place-items:center;background:var(--color-neutral-300);color:var(--color-neutral-900);font-size:10px;font-weight:800">{{ t.initials }}</div>
+                  </div>
+                </div>
+              </sc-for>
+              <button class="btn btn-ghost" onClick="{{ c.onAdd }}" style="justify-content:flex-start"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Add task</button>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isMembers }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:var(--space-8);max-width:960px">
+          <section style="display:flex;flex-direction:column;gap:var(--space-3)">
+            <h4 style="margin:0">Invite people</h4>
+            <sc-if value="{{ canManage }}" hint-placeholder-val="{{ true }}">
+              <form onSubmit="{{ sendInvite }}" style="display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:flex-end">
+                <div class="field" style="flex:1;min-width:220px"><label>Email</label><input class="input" type="email" placeholder="name@company.com" value="{{ inviteEmail }}" onChange="{{ onInviteEmail }}"></div>
+                <div class="field" style="width:140px"><label>Role</label>
+                  <select class="input" value="{{ inviteRole }}" onChange="{{ onInviteRole }}"><option value="MEMBER">Member</option><option value="ADMIN">Admin</option></select>
+                </div>
+                <button class="btn btn-primary" type="submit" disabled="{{ inviteInvalid }}" style="min-height:36px">Send invite</button>
+              </form>
+            </sc-if>
+            <sc-if value="{{ isMember }}" hint-placeholder-val="{{ false }}">
+              <p class="text-muted" style="margin:0">Only owners and admins can invite people or change roles.</p>
+            </sc-if>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:var(--space-2)">
+            <div style="display:flex;align-items:baseline;gap:var(--space-2)"><h4 style="margin:0">Members</h4><div class="text-muted">{{ memberCount }}</div></div>
+            <div style="overflow-x:auto">
+              <table class="table" style="min-width:560px">
+                <thead><tr><th>Name</th><th style="width:150px">Role</th><th style="width:110px">Joined</th><th style="width:90px"></th></tr></thead>
+                <tbody>
+                  <sc-for list="{{ memberRows }}" as="m" hint-placeholder-count="4">
+                    <tr>
+                      <td><div style="display:flex;align-items:center;gap:var(--space-3)"><div style="width:32px;height:32px;flex:none;display:grid;place-items:center;background:var(--color-neutral-300);color:var(--color-neutral-900);font-size:11px;font-weight:800">{{ m.initials }}</div><div><div style="font-weight:600">{{ m.name }}<span class="text-muted" style="font-weight:400">{{ m.youLabel }}</span></div><div class="text-muted" style="font-size:12px">{{ m.email }}</div></div></div></td>
+                      <td>
+                        <sc-if value="{{ m.roleSelectable }}" hint-placeholder-val="{{ false }}">
+                          <select class="input" value="{{ m.role }}" onChange="{{ m.onRole }}" style="min-height:30px;padding:3px 8px"><option value="ADMIN">Admin</option><option value="MEMBER">Member</option></select>
+                        </sc-if>
+                        <sc-if value="{{ m.roleFixed }}" hint-placeholder-val="{{ true }}"><div class="{{ m.roleTag }}">{{ m.roleLabel }}</div></sc-if>
+                      </td>
+                      <td class="text-muted" style="font-size:13px">{{ m.joined }}</td>
+                      <td><sc-if value="{{ m.canRemove }}" hint-placeholder-val="{{ false }}"><button class="btn btn-ghost" onClick="{{ m.onRemove }}" style="color:var(--tm-danger)">Remove</button></sc-if></td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:var(--space-2)">
+            <div style="display:flex;align-items:baseline;gap:var(--space-2)"><h4 style="margin:0">Pending invitations</h4><div class="text-muted">{{ inviteCount }}</div></div>
+            <sc-if value="{{ noInvites }}" hint-placeholder-val="{{ false }}"><p class="text-muted" style="margin:0;padding:var(--space-3) 0;border-top:2px solid var(--color-divider)">No pending invitations.</p></sc-if>
+            <sc-if value="{{ hasInvites }}" hint-placeholder-val="{{ true }}">
+              <div style="overflow-x:auto">
+                <table class="table" style="min-width:560px">
+                  <thead><tr><th>Email</th><th style="width:110px">Role</th><th style="width:110px">Sent</th><th style="width:110px">Expires</th><th style="width:170px"></th></tr></thead>
+                  <tbody>
+                    <sc-for list="{{ inviteRows }}" as="i" hint-placeholder-count="2">
+                      <tr>
+                        <td style="font-weight:600">{{ i.email }}</td>
+                        <td><div class="tag tag-neutral">{{ i.roleLabel }}</div></td>
+                        <td class="text-muted" style="font-size:13px">{{ i.sent }}</td>
+                        <td style="font-size:13px;color:{{ i.expColor }}">{{ i.expires }}</td>
+                        <td><sc-if value="{{ canManage }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:var(--space-2)"><button class="btn btn-ghost" onClick="{{ i.onResend }}">Resend</button><button class="btn btn-ghost" onClick="{{ i.onRevoke }}" style="color:var(--tm-danger)">Revoke</button></div></sc-if></td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+            </sc-if>
+          </section>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:var(--space-8);max-width:640px">
+          <section style="display:flex;flex-direction:column;gap:var(--space-3)">
+            <h4 style="margin:0">Project details</h4>
+            <div class="field"><label>Name</label><input class="input" value="{{ proj.name }}" onChange="{{ onProjName }}" disabled="{{ isMember }}"></div>
+            <div class="field"><label>Description</label><textarea class="input" value="{{ proj.description }}" onChange="{{ onProjDesc }}" disabled="{{ isMember }}"></textarea></div>
+            <sc-if value="{{ canManage }}" hint-placeholder-val="{{ true }}"><button class="btn btn-primary" onClick="{{ saveProject }}" style="align-self:flex-start">Save changes</button></sc-if>
+            <sc-if value="{{ isMember }}" hint-placeholder-val="{{ false }}"><p class="text-muted" style="margin:0">Only owners and admins can edit project details.</p></sc-if>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:var(--space-3);padding-top:var(--space-4);border-top:2px solid var(--tm-danger)">
+            <h4 style="margin:0;color:var(--tm-danger)">Danger zone</h4>
+            <sc-if value="{{ isOwner }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center;justify-content:space-between">
+                <div style="max-width:42ch"><div style="font-weight:600">Delete this project</div><div class="text-muted" style="font-size:13px">Removes all tasks, comments and invitations. This can't be undone.</div></div>
+                <button class="btn btn-secondary" onClick="{{ askDelete }}" style="color:var(--tm-danger);border-color:var(--tm-danger)">Delete project</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{ notOwner }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center;justify-content:space-between">
+                <div style="max-width:42ch"><div style="font-weight:600">Leave this project</div><div class="text-muted" style="font-size:13px">Only the owner can delete the project. Your assigned tasks become unassigned.</div></div>
+                <button class="btn btn-secondary" onClick="{{ leaveProject }}" style="color:var(--tm-danger);border-color:var(--tm-danger)">Leave project</button>
+              </div>
+            </sc-if>
+          </section>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:var(--space-8);max-width:640px">
+          <div style="display:flex;align-items:center;gap:var(--space-4);padding-bottom:var(--space-4);border-bottom:2px solid var(--color-divider)">
+            <div style="width:64px;height:64px;display:grid;place-items:center;background:var(--color-accent-200);color:var(--color-accent-900);font-size:22px;font-weight:800">MO</div>
+            <div><h2 style="margin:0">{{ profileName }}</h2><div class="text-muted">mara@taskmaster.app</div></div>
+          </div>
+          <section style="display:flex;flex-direction:column;gap:var(--space-3)">
+            <h4 style="margin:0">Profile</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--space-3)">
+              <div class="field"><label>Full name</label><input class="input" value="{{ profileName }}" onChange="{{ onProfileName }}"></div>
+              <div class="field"><label>Email</label><input class="input" value="mara@taskmaster.app" disabled="{{ true }}"></div>
+            </div>
+            <button class="btn btn-primary" onClick="{{ saveProfile }}" style="align-self:flex-start">Save profile</button>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:var(--space-3);padding-top:var(--space-4);border-top:2px solid var(--color-divider)">
+            <h4 style="margin:0">Password</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--space-3)">
+              <div class="field"><label>Current password</label><input class="input" type="password"></div>
+              <div class="field"><label>New password</label><input class="input" type="password"></div>
+            </div>
+            <button class="btn btn-secondary" onClick="{{ savePassword }}" style="align-self:flex-start">Update password</button>
+          </section>
+          <section style="display:flex;flex-wrap:wrap;gap:var(--space-3);padding-top:var(--space-4);border-top:2px solid var(--color-divider)">
+            <button class="btn btn-secondary" onClick="{{ signOut }}">Sign out</button>
+            <button class="btn btn-ghost" onClick="{{ backToTasks }}">Back to tasks</button>
+          </section>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isTokens }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:var(--space-8);max-width:1100px">
+          <div style="padding-bottom:var(--space-4);border-bottom:2px solid var(--color-divider)">
+            <div class="card-kicker" style="color:var(--color-accent-700)">Hand-off</div>
+            <h2 style="margin:0">Tokens &amp; components</h2>
+            <p class="text-muted" style="margin:var(--space-2) 0 0;max-width:70ch">Modernist base (Archivo, 0 radius, 2px rules) with a teal accent and a dark theme. Use the theme switch above to see both. Files: <a href="taskmaster-tokens.css" target="_blank">taskmaster-tokens.css</a> · <a href="tailwind.config.js" target="_blank">tailwind.config.js</a></p>
+          </div>
+          <section style="display:flex;flex-direction:column;gap:var(--space-3)">
+            <h4 style="margin:0">Color roles</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:var(--space-3)">
+              <sc-for list="{{ roleSwatches }}" as="s" hint-placeholder-count="6">
+                <div style="display:flex;flex-direction:column;gap:6px"><div style="height:64px;background:{{ s.v }};border:1px solid var(--color-divider)"></div><div style="font-weight:600;font-size:13px">{{ s.name }}</div><div class="text-muted" style="font-size:11px;font-family:ui-monospace,monospace">{{ s.token }}</div></div>
+              </sc-for>
+            </div>
+            <sc-for list="{{ ramps }}" as="r" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:6px;margin-top:var(--space-2)">
+                <div style="font-size:12px;font-weight:600">{{ r.name }}</div>
+                <div style="display:grid;grid-template-columns:repeat(9,minmax(0,1fr))">
+                  <sc-for list="{{ r.steps }}" as="st" hint-placeholder-count="9"><div style="display:flex;flex-direction:column;gap:4px"><div style="height:40px;background:{{ st.v }}"></div><div class="text-muted" style="font-size:11px">{{ st.n }}</div></div></sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:var(--space-3);padding-top:var(--space-4);border-top:2px solid var(--color-divider)">
+            <h4 style="margin:0">Type — Archivo</h4>
+            <sc-for list="{{ typeScale }}" as="ty" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:140px minmax(0,1fr);gap:var(--space-4);align-items:baseline;padding-bottom:var(--space-2);border-bottom:1px solid var(--color-divider)">
+                <div class="text-muted" style="font-size:12px;font-family:ui-monospace,monospace">{{ ty.spec }}</div>
+                <div style="font-size:{{ ty.size }};font-weight:{{ ty.weight }};line-height:1.15">{{ ty.sample }}</div>
+              </div>
+            </sc-for>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:var(--space-3);padding-top:var(--space-4);border-top:2px solid var(--color-divider)">
+            <h4 style="margin:0">Spacing</h4>
+            <sc-for list="{{ spaces }}" as="sp" hint-placeholder-count="6">
+              <div style="display:flex;align-items:center;gap:var(--space-4)"><div class="text-muted" style="width:140px;font-size:12px;font-family:ui-monospace,monospace">{{ sp.label }}</div><div style="height:12px;width:{{ sp.v }};background:var(--color-accent)"></div></div>
+            </sc-for>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:var(--space-4);padding-top:var(--space-4);border-top:2px solid var(--color-divider)">
+            <h4 style="margin:0">Components</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--space-6)">
+              <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+                <h6 class="text-muted" style="margin:0">Buttons</h6>
+                <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)"><button class="btn btn-primary">Primary</button><button class="btn btn-secondary">Secondary</button><button class="btn btn-ghost">Ghost</button><button class="btn btn-primary" disabled="{{ true }}">Disabled</button></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+                <h6 class="text-muted" style="margin:0">Status &amp; role tags</h6>
+                <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)"><div class="tag tag-neutral">To do</div><div class="tag tag-accent">In progress</div><div class="tag tag-outline">Done</div><div class="tag tag-accent">Owner</div><div class="tag tag-neutral">Member</div></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+                <h6 class="text-muted" style="margin:0">Priority marks</h6>
+                <div style="display:flex;gap:var(--space-4);font-size:13px"><div style="display:flex;align-items:center;gap:6px"><div style="width:8px;height:8px;background:var(--tm-prio-high)"></div>High</div><div style="display:flex;align-items:center;gap:6px"><div style="width:8px;height:8px;background:var(--tm-prio-medium)"></div>Medium</div><div style="display:flex;align-items:center;gap:6px"><div style="width:8px;height:8px;background:var(--tm-prio-low)"></div>Low</div></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+                <h6 class="text-muted" style="margin:0">Field</h6>
+                <div class="field"><label>Title</label><input class="input" placeholder="What needs doing?"></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+                <h6 class="text-muted" style="margin:0">Task card</h6>
+                <div class="card elev-sm"><div class="text-muted" style="font-size:11px">TM-101 · High</div><div class="card-title" style="font-size:15px">Finalise homepage hero copy</div><div class="card-meta">Oct 23 · MO</div></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+                <h6 class="text-muted" style="margin:0">Rules</h6>
+                <div style="height:2px;background:var(--color-divider)"></div><div class="text-muted" style="font-size:12px">2px — section · 1px — row</div><div style="height:1px;background:var(--color-divider)"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+</sc-if>
+
+<sc-if value="{{ hasDetail }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;z-index:40;display:flex;justify-content:flex-end">
+    <div onClick="{{ closeDetail }}" style="position:absolute;inset:0;background:color-mix(in srgb,var(--color-neutral-900) 40%,transparent)"></div>
+    <aside style="position:relative;width:min(560px,100%);height:100%;overflow-y:auto;background:var(--color-bg);border-left:2px solid var(--color-divider);box-shadow:var(--shadow-lg);display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);border-bottom:2px solid var(--color-divider);position:sticky;top:0;background:var(--color-bg);z-index:1">
+        <div class="text-muted" style="font-size:13px;margin-right:auto">{{ proj.name }} / {{ detail.key }}</div>
+        <button class="btn btn-icon" aria-label="Close" onClick="{{ closeDetail }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      </div>
+      <div style="padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-4)">
+        <textarea value="{{ detail.title }}" onChange="{{ detail.onTitle }}" rows="2" style="width:100%;border:0;background:transparent;color:inherit;font-family:var(--font-heading);font-weight:800;font-size:26px;line-height:1.15;resize:none;padding:0"></textarea>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-3)">
+          <div class="field"><label>Status</label><select class="input" value="{{ detail.status }}" onChange="{{ detail.onStatus }}"><option value="TODO">To do</option><option value="IN_PROGRESS">In progress</option><option value="DONE">Done</option></select></div>
+          <div class="field"><label>Priority</label><select class="input" value="{{ detail.priority }}" onChange="{{ detail.onPriority }}"><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option></select></div>
+          <div class="field"><label>Assignee</label><select class="input" value="{{ detail.assignee }}" onChange="{{ detail.onAssignee }}"><option value="">Unassigned</option><sc-for list="{{ memberOpts }}" as="mo" hint-placeholder-count="4"><option value="{{ mo.id }}">{{ mo.name }}</option></sc-for></select></div>
+          <div class="field"><label>Due date</label><input class="input" type="date" value="{{ detail.due }}" onChange="{{ detail.onDue }}"></div>
+        </div>
+        <div class="field"><label>Description</label><textarea class="input" value="{{ detail.description }}" onChange="{{ detail.onDesc }}" style="min-height:130px"></textarea></div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-3);padding-top:var(--space-3);border-top:2px solid var(--color-divider)">
+          <div style="display:flex;align-items:baseline;gap:var(--space-2)"><h5 style="margin:0">Comments</h5><div class="text-muted" style="font-size:12px">{{ detail.commentCount }}</div></div>
+          <sc-for list="{{ detail.comments }}" as="cm" hint-placeholder-count="1">
+            <div style="display:grid;grid-template-columns:28px 1fr;gap:var(--space-3)">
+              <div style="width:28px;height:28px;display:grid;place-items:center;background:var(--color-neutral-300);color:var(--color-neutral-900);font-size:10px;font-weight:800">{{ cm.initials }}</div>
+              <div><div style="font-size:13px"><b>{{ cm.name }}</b> <span class="text-muted">{{ cm.at }}</span></div><div style="font-size:14px">{{ cm.text }}</div></div>
+            </div>
+          </sc-for>
+          <form onSubmit="{{ detail.addComment }}" style="display:flex;gap:var(--space-2)">
+            <input class="input" placeholder="Write a comment" value="{{ commentDraft }}" onChange="{{ onCommentDraft }}">
+            <button class="btn btn-secondary" type="submit" disabled="{{ commentEmpty }}">Post</button>
+          </form>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3);padding-top:var(--space-3);border-top:2px solid var(--color-divider)">
+          <div class="text-muted" style="font-size:12px;margin-right:auto">Created by {{ detail.creator }} · {{ detail.created }}</div>
+          <button class="btn btn-ghost" onClick="{{ detail.onDelete }}" disabled="{{ detail.cannotDelete }}" style="color:var(--tm-danger)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"></path><path d="M19 6v14H5V6"></path><path d="M8 6V3h8v3"></path></svg>Delete task</button>
+        </div>
+        <sc-if value="{{ detail.cannotDelete }}" hint-placeholder-val="{{ false }}"><div class="text-muted" style="font-size:12px">Members can delete only tasks they created.</div></sc-if>
+      </div>
+    </aside>
+  </div>
+</sc-if>
+
+<sc-if value="{{ newOpen }}" hint-placeholder-val="{{ false }}">
+  <div class="dialog-backdrop" style="z-index:50" onClick="{{ closeNewBackdrop }}">
+    <form class="dialog" onSubmit="{{ createTask }}" style="width:min(580px,100%);max-height:calc(100vh - 32px);overflow-y:auto;background:var(--color-bg)">
+      <div style="display:flex;align-items:center"><div class="dialog-title" style="margin-right:auto">New task</div><button type="button" class="btn btn-icon" aria-label="Close" onClick="{{ closeNew }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <div class="field"><label>Title</label><input class="input" placeholder="What needs doing?" value="{{ draft.title }}" onChange="{{ onDraftTitle }}" style="font-size:16px"></div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3);padding:var(--space-3);background:var(--color-accent-100);color:var(--color-accent-900)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path></svg>
+        <div style="flex:1;min-width:180px;font-size:13px">{{ aiHint }}</div>
+        <button type="button" class="btn btn-secondary" onClick="{{ aiDraft }}" disabled="{{ aiDisabled }}" style="border-color:var(--color-accent-700);color:inherit">{{ aiLabel }}</button>
+      </div>
+      <div class="field"><label>Description</label><textarea class="input" placeholder="Details, links, acceptance criteria" value="{{ draft.description }}" onChange="{{ onDraftDesc }}" style="min-height:120px"></textarea></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3)">
+        <div class="field"><label>Status</label><select class="input" value="{{ draft.status }}" onChange="{{ onDraftStatus }}"><option value="TODO">To do</option><option value="IN_PROGRESS">In progress</option><option value="DONE">Done</option></select></div>
+        <div class="field"><label>Priority</label><select class="input" value="{{ draft.priority }}" onChange="{{ onDraftPriority }}"><option value="HIGH">High</option><option value="MEDIUM">Medium</option><option value="LOW">Low</option></select></div>
+        <div class="field"><label>Assignee</label><select class="input" value="{{ draft.assignee }}" onChange="{{ onDraftAssignee }}"><option value="">Unassigned</option><sc-for list="{{ memberOpts }}" as="mo" hint-placeholder-count="4"><option value="{{ mo.id }}">{{ mo.name }}</option></sc-for></select></div>
+        <div class="field"><label>Due date</label><input class="input" type="date" value="{{ draft.due }}" onChange="{{ onDraftDue }}"></div>
+      </div>
+      <div class="dialog-actions"><button type="button" class="btn btn-secondary" onClick="{{ closeNew }}">Cancel</button><button type="submit" class="btn btn-primary" disabled="{{ draftInvalid }}">Create task</button></div>
+    </form>
+  </div>
+</sc-if>
+
+<sc-if value="{{ confirmDelete }}" hint-placeholder-val="{{ false }}">
+  <div class="dialog-backdrop" style="z-index:50">
+    <div class="dialog" style="background:var(--color-bg)">
+      <div class="dialog-title">Delete “{{ proj.name }}”?</div>
+      <div class="dialog-body">This permanently removes {{ projTaskCount }} tasks, their comments and all pending invitations. Type the project name to confirm.</div>
+      <input class="input" value="{{ deleteText }}" onChange="{{ onDeleteText }}" placeholder="{{ proj.name }}">
+      <div class="dialog-actions"><button class="btn btn-secondary" onClick="{{ cancelDelete }}">Cancel</button><button class="btn btn-primary" onClick="{{ confirmDeleteProject }}" disabled="{{ deleteMismatch }}" style="background:var(--tm-danger);color:var(--color-bg)">Delete project</button></div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;left:var(--space-4);bottom:var(--space-4);z-index:60;padding:10px 14px;background:var(--color-text);color:var(--color-bg);font-size:14px;font-weight:600;box-shadow:var(--shadow-lg)">{{ toast }}</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;OWNER&quot;,&quot;ADMIN&quot;,&quot;MEMBER&quot;],&quot;default&quot;:&quot;OWNER&quot;,&quot;tsType&quot;:&quot;'OWNER'|'ADMIN'|'MEMBER'&quot;},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;A&quot;,&quot;B&quot;,&quot;C&quot;],&quot;default&quot;:&quot;A&quot;,&quot;tsType&quot;:&quot;'A'|'B'|'C'&quot;,&quot;section&quot;:&quot;Task list option&quot;}}">
+const USERS = {
+  u1: { name: 'Mara Okafor', email: 'mara@taskmaster.app', joined: 'Mar 2025' },
+  u2: { name: 'Jonas Weber', email: 'jonas@studio-w.de', joined: 'Mar 2025' },
+  u3: { name: 'Priya Raman', email: 'priya@raman.io', joined: 'Jun 2025' },
+  u4: { name: 'Tom Lind', email: 'tom.lind@gmail.com', joined: 'Oct 2026' }
+};
+const ini = n => n.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+const T = (n, p, title, status, priority, assignee, due, description, comments = []) => ({ id: 't' + n, key: 'TM-' + n, projectId: p, title, status, priority, assignee, due, description, createdBy: n % 2 ? 'u1' : 'u2', created: 'Oct ' + (n % 12 + 1), comments });
+const TASKS = [
+  T(101, 'p1', 'Finalise homepage hero copy', 'IN_PROGRESS', 'HIGH', 'u1', '2026-10-23', 'Tighten the headline to under eight words and align it with the launch messaging doc.', [{ by: 'u2', text: 'Draft v3 is in the doc — shorter, keeps the pricing hook.', at: '2h ago' }]),
+  T(102, 'p1', 'Migrate blog posts to new CMS', 'TODO', 'MEDIUM', 'u3', '2026-10-28', 'Export 140 posts, preserve slugs, keep author pages.'),
+  T(103, 'p1', 'Set up 301 redirects', 'TODO', 'HIGH', 'u2', '2026-10-18', 'Map every legacy URL; run the crawler before the DNS switch.'),
+  T(104, 'p1', 'Pricing page layout', 'IN_PROGRESS', 'MEDIUM', 'u2', '2026-10-25', 'Three plans, annual toggle, FAQ below the fold.'),
+  T(105, 'p1', 'Cookie consent banner', 'DONE', 'LOW', 'u4', '2026-10-14', 'Use the existing consent provider; match the new type scale.'),
+  T(106, 'p1', 'Docs search', 'TODO', 'LOW', 'u4', '2026-11-04', 'Index docs on deploy; open with the / shortcut.'),
+  T(107, 'p1', 'Lighthouse pass on all templates', 'TODO', 'MEDIUM', 'u1', '2026-11-01', 'Target 95+ mobile performance on every template.'),
+  T(108, 'p1', 'Footer and legal pages', 'DONE', 'LOW', 'u3', '2026-10-12', 'Imprint, privacy, terms. Legal has signed off.'),
+  T(201, 'p2', 'Offline sync conflict rules', 'IN_PROGRESS', 'HIGH', 'u2', '2026-10-27', 'Last-write-wins per field; surface conflicts on task detail.'),
+  T(202, 'p2', 'Onboarding — three screens', 'TODO', 'MEDIUM', 'u3', '2026-10-30', 'Welcome, create first project, invite a teammate.'),
+  T(203, 'p2', 'Push notification permissions', 'TODO', 'MEDIUM', 'u1', '2026-11-06', 'Ask after the first assigned task, not on launch.'),
+  T(301, 'p3', 'Write product designer JD', 'DONE', 'MEDIUM', 'u1', '2026-10-10', 'Focus on systems work and prototyping.'),
+  T(302, 'p3', 'Screen backend applicants', 'IN_PROGRESS', 'HIGH', 'u4', '2026-10-24', '42 applicants; shortlist 8 for the take-home.')
+];
+const STATUS = [['TODO', 'To do', 'tag tag-neutral'], ['IN_PROGRESS', 'In progress', 'tag tag-accent'], ['DONE', 'Done', 'tag tag-outline']];
+const PRIO = { HIGH: ['High', 'var(--tm-prio-high)'], MEDIUM: ['Medium', 'var(--tm-prio-medium)'], LOW: ['Low', 'var(--tm-prio-low)'] };
+const TODAY = '2026-10-21';
+const fmt = d => d ? new Date(d + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date';
+const RL = { OWNER: 'Owner', ADMIN: 'Admin', MEMBER: 'Member' };
+
+class Component extends DCLogic {
+  state = {
+    authed: true, authMode: 'login', view: 'list', theme: null, role: null, density: null,
+    projects: [
+      { id: 'p1', name: 'Website relaunch', description: 'New marketing site and docs, live before the November launch.' },
+      { id: 'p2', name: 'Mobile app v2', description: 'Offline sync, new onboarding and push notifications.' },
+      { id: 'p3', name: 'Q4 hiring', description: 'Two engineers and a product designer by year end.' }
+    ],
+    projectId: 'p1', tasks: TASKS, filter: 'ALL', q: '', openId: null, newOpen: false,
+    draft: null, aiBusy: false, notifOpen: false, commentDraft: '',
+    notifs: [
+      { id: 'n1', text: 'Jonas Weber commented on “Finalise homepage hero copy”', at: '2h ago', unread: true, task: 't101' },
+      { id: 'n2', text: 'Priya Raman assigned you “Lighthouse pass on all templates”', at: '5h ago', unread: true, task: 't107' },
+      { id: 'n3', text: '“Set up 301 redirects” is overdue', at: 'Yesterday', unread: false, task: 't103' },
+      { id: 'n4', text: 'Tom Lind accepted your invitation to Website relaunch', at: '2 days ago', unread: false, view: 'members' }
+    ],
+    memberIds: ['u1', 'u2', 'u3', 'u4'], roles: { u2: 'ADMIN', u3: 'MEMBER', u4: 'MEMBER' },
+    invites: [
+      { id: 'i1', email: 'lena@agency.co', role: 'MEMBER', sent: 'Oct 19', expires: 'In 5 days' },
+      { id: 'i2', email: 'sam.k@gmail.com', role: 'ADMIN', sent: 'Oct 12', expires: 'Expired' }
+    ],
+    inviteEmail: '', inviteRole: 'MEMBER', confirmDelete: false, deleteText: '', profileName: 'Mara Okafor',
+    w: typeof window !== 'undefined' ? window.innerWidth : 1280, toast: null
+  };
+  componentDidMount() { this.onResize = () => this.setState({ w: window.innerWidth }); window.addEventListener('resize', this.onResize); }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); clearTimeout(this.tt); }
+  say(msg) { clearTimeout(this.tt); this.setState({ toast: msg }); this.tt = setTimeout(() => this.setState({ toast: null }), 2600); }
+  upd(id, patch) { this.setState(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t) })); }
+  newDraft(status = 'TODO') { return { title: '', description: '', status, priority: 'MEDIUM', assignee: 'u1', due: '' }; }
+  setDraft(patch) { this.setState(s => ({ draft: { ...s.draft, ...patch } })); }
+
+  async aiDraftRun() {
+    const s = this.state, title = s.draft.title.trim();
+    if (!title) return this.say('Add a title first');
+    this.setState({ aiBusy: true });
+    const proj = s.projects.find(p => p.id === s.projectId);
+    let out = null;
+    try {
+      if (window.claude && window.claude.complete) {
+        const r = await window.claude.complete(`You write task descriptions for a project management app. Project: "${proj.name}" — ${proj.description}. Task title: "${title}". Reply with ONLY JSON, no prose: {"description":"2 short concrete sentences","priority":"LOW|MEDIUM|HIGH","checklist":["3-4 short steps"]}`);
+        out = JSON.parse(r.slice(r.indexOf('{'), r.lastIndexOf('}') + 1));
+      }
+    } catch (e) { out = null; }
+    if (!out) out = { description: `Scope and deliver “${title}” for ${proj.name}. Confirm the definition of done with the owner before starting.`, priority: 'MEDIUM', checklist: ['Agree scope and owner', 'Draft and share for review', 'Address feedback', 'Mark done and notify team'] };
+    const desc = out.description + (out.checklist && out.checklist.length ? '\n\n' + out.checklist.map(c => '– ' + c).join('\n') : '');
+    this.setState(st => ({ aiBusy: false, draft: { ...st.draft, description: desc, priority: PRIO[out.priority] ? out.priority : st.draft.priority } }));
+  }
+
+  renderVals() {
+    const s = this.state, P = this.props;
+    const theme = s.theme ?? P.theme ?? 'light', role = s.role ?? P.role ?? 'OWNER', density = s.density ?? P.density ?? 'A';
+    const narrow = s.w < 820, canManage = role !== 'MEMBER', isOwner = role === 'OWNER';
+    const proj = s.projects.find(p => p.id === s.projectId) || s.projects[0];
+    const roleOf = id => id === 'u1' ? role : id === 'u2' && role !== 'OWNER' ? 'OWNER' : (s.roles[id] || 'MEMBER');
+    const uname = id => id === 'u1' ? s.profileName : (USERS[id] ? USERS[id].name : 'Unassigned');
+    const pt = s.tasks.filter(t => t.projectId === proj.id);
+    const q = s.q.trim().toLowerCase();
+    const qt = pt.filter(t => !q || t.title.toLowerCase().includes(q));
+    const vis = qt.filter(t => s.filter === 'ALL' || t.status === s.filter);
+    const row = t => {
+      const st = STATUS.find(x => x[0] === t.status), over = t.due && t.due < TODAY && t.status !== 'DONE';
+      return {
+        ...t, statusLabel: st[1], tagClass: st[2], prioLabel: PRIO[t.priority][0], prioColor: PRIO[t.priority][1],
+        assigneeName: t.assignee ? uname(t.assignee) : 'Unassigned', initials: t.assignee ? ini(uname(t.assignee)) : '—',
+        dueLabel: over ? 'Overdue · ' + fmt(t.due) : fmt(t.due), dueColor: over ? 'var(--tm-danger)' : 'inherit', dueWeight: over ? 700 : 400,
+        onOpen: () => this.setState({ openId: t.id, commentDraft: '', notifOpen: false }),
+        onDragStart: e => { this.dragId = t.id; e.dataTransfer.effectAllowed = 'move'; }
+      };
+    };
+    const view = s.view, isTasks = view === 'list' || view === 'board';
+    const go = v => () => this.setState({ view: v, notifOpen: false });
+    const mkSeg = (name, label, cur, opts, key) => ({ name, label, options: opts.map(([v, l]) => ({ label: l, checked: cur === v, onChange: () => this.setState({ [key]: v, ...(key === 'density' ? { view: 'list' } : {}) }) })) });
+
+    const ot = s.openId && s.tasks.find(t => t.id === s.openId);
+    const detail = ot ? {
+      ...ot, creator: uname(ot.createdBy), commentCount: ot.comments.length,
+      comments: ot.comments.map(c => ({ ...c, name: uname(c.by), initials: ini(uname(c.by)) })),
+      cannotDelete: !(canManage || ot.createdBy === 'u1'),
+      onTitle: e => this.upd(ot.id, { title: e.target.value }), onStatus: e => this.upd(ot.id, { status: e.target.value }),
+      onPriority: e => this.upd(ot.id, { priority: e.target.value }), onAssignee: e => this.upd(ot.id, { assignee: e.target.value }),
+      onDue: e => this.upd(ot.id, { due: e.target.value }), onDesc: e => this.upd(ot.id, { description: e.target.value }),
+      addComment: e => { e.preventDefault(); const txt = s.commentDraft.trim(); if (!txt) return; this.upd(ot.id, { comments: [...ot.comments, { by: 'u1', text: txt, at: 'Just now' }] }); this.setState({ commentDraft: '' }); },
+      onDelete: () => { this.setState(st => ({ tasks: st.tasks.filter(t => t.id !== ot.id), openId: null })); this.say(ot.key + ' deleted'); }
+    } : null;
+
+    const unread = s.notifs.filter(n => n.unread).length;
+    const members = s.memberIds.map(id => {
+      const r = roleOf(id), sel = isOwner && id !== 'u1' && r !== 'OWNER';
+      return {
+        id, name: uname(id), email: USERS[id].email, initials: ini(uname(id)), joined: USERS[id].joined, youLabel: id === 'u1' ? ' (you)' : '',
+        role: r, roleLabel: RL[r], roleTag: r === 'OWNER' ? 'tag tag-accent' : 'tag tag-neutral', roleSelectable: sel, roleFixed: !sel,
+        canRemove: canManage && id !== 'u1' && r !== 'OWNER' && !(role === 'ADMIN' && r === 'ADMIN'),
+        onRole: e => { this.setState(st => ({ roles: { ...st.roles, [id]: e.target.value } })); this.say(uname(id) + ' is now ' + RL[e.target.value]); },
+        onRemove: () => { this.setState(st => ({ memberIds: st.memberIds.filter(x => x !== id) })); this.say(uname(id) + ' removed'); }
+      };
+    });
+    const draft = s.draft || this.newDraft();
+    const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.inviteEmail);
+
+    return {
+      theme, narrow, wide: !narrow,
+      isDarkTheme: theme === 'dark', knobX: theme === 'dark' ? '30px' : '0px', themeTitle: theme === 'dark' ? 'Switch to light' : 'Switch to dark',
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' }), authed: s.authed, notAuthed: !s.authed, toast: s.toast,
+      demoSegs: [
+        mkSeg('th', 'Theme', theme, [['light', 'Light'], ['dark', 'Dark']], 'theme'),
+        mkSeg('rl', 'Role', role, [['OWNER', 'Owner'], ['ADMIN', 'Admin'], ['MEMBER', 'Member']], 'role'),
+        mkSeg('dn', 'List density', density, [['A', 'A · Rows'], ['B', 'B · Table'], ['C', 'C · Grouped']], 'density')
+      ],
+      authToggleLabel: s.authed ? 'Show sign-in' : 'Skip to app', toggleAuth: () => this.setState({ authed: !s.authed, openId: null, newOpen: false }),
+      goTokens: () => this.setState({ authed: true, view: 'tokens', openId: null }),
+      authIsLogin: s.authMode === 'login', authIsRegister: s.authMode === 'register',
+      setLogin: () => this.setState({ authMode: 'login' }), setRegister: () => this.setState({ authMode: 'register' }),
+      authTitle: s.authMode === 'login' ? 'Welcome back' : 'Start with a project', authCta: s.authMode === 'login' ? 'Sign in' : 'Create account',
+      onAuthSubmit: e => { e.preventDefault(); this.setState({ authed: true, view: 'list' }); }, noop: () => {},
+      q: s.q, onSearch: e => this.setState({ q: e.target.value }),
+      notifOpen: s.notifOpen, toggleNotif: () => this.setState({ notifOpen: !s.notifOpen }),
+      unreadCount: unread, hasUnread: unread > 0, noUnread: unread === 0,
+      markAllRead: () => this.setState(st => ({ notifs: st.notifs.map(n => ({ ...n, unread: false })) })),
+      notifs: s.notifs.map(n => ({ ...n, dot: n.unread ? 'var(--color-accent)' : 'transparent', weight: n.unread ? 600 : 400,
+        onClick: () => this.setState(st => ({ notifOpen: false, notifs: st.notifs.map(x => x.id === n.id ? { ...x, unread: false } : x), ...(n.task ? { openId: n.task, projectId: 'p1', view: st.view === 'board' ? 'board' : 'list' } : { view: n.view }) })) })),
+      goProfile: go('profile'), backToTasks: go('list'),
+      signOut: () => this.setState({ authed: false, authMode: 'login' }),
+      projectItems: s.projects.map(p => {
+        const a = p.id === proj.id;
+        return { ...p, count: s.tasks.filter(t => t.projectId === p.id && t.status !== 'DONE').length, bg: a ? 'var(--color-accent-100)' : 'transparent', fg: a ? 'var(--color-accent-900)' : 'inherit', weight: a ? 700 : 400,
+          onClick: () => this.setState(st => ({ projectId: p.id, view: ['profile', 'tokens'].includes(st.view) ? 'list' : st.view, filter: 'ALL' })) };
+      }),
+      projectId: proj.id, onProjectSelect: e => this.setState({ projectId: e.target.value, filter: 'ALL' }),
+      addProject: () => { const id = 'p' + Date.now(); this.setState(st => ({ projects: [...st.projects, { id, name: 'Untitled project', description: 'Add a short description.' }], projectId: id, view: 'settings' })); },
+      proj, roleLabel: 'You’re ' + RL[role].toLowerCase(),
+      showProjectHeader: view !== 'profile' && view !== 'tokens',
+      tabs: [['list', 'List'], ['board', 'Board'], ['members', 'Members'], ['settings', 'Settings']].map(([v, l]) => ({ label: l, active: view === v, weight: view === v ? 800 : 400, onClick: go(v) })),
+      isTasks, isList: view === 'list', isBoard: view === 'board', isMembers: view === 'members', isSettings: view === 'settings', isProfile: view === 'profile', isTokens: view === 'tokens',
+      filterOpts: [['ALL', 'All', qt.length], ...STATUS.map(([v, l]) => [v, l, qt.filter(t => t.status === v).length])].map(([v, l, c]) => ({ label: l, count: c, checked: s.filter === v, onChange: () => this.setState({ filter: v }) })),
+      clearFilters: () => this.setState({ filter: 'ALL', q: '' }),
+      listEmpty: view === 'list' && vis.length === 0,
+      showA: view === 'list' && density === 'A' && vis.length > 0, showB: view === 'list' && density === 'B' && vis.length > 0, showC: view === 'list' && density === 'C' && vis.length > 0,
+      rows: vis.map(row),
+      listGroups: STATUS.map(([v, l]) => ({ label: l, tasks: vis.filter(t => t.status === v).map(row) })).filter(g => g.tasks.length).map(g => ({ ...g, count: g.tasks.length })),
+      columns: STATUS.map(([v, l]) => {
+        const ts = qt.filter(t => t.status === v).map(row);
+        return { label: l, count: ts.length, tasks: ts, onDragOver: e => e.preventDefault(),
+          onDrop: e => { e.preventDefault(); if (this.dragId) { this.upd(this.dragId, { status: v }); this.dragId = null; } },
+          onAdd: () => this.setState({ newOpen: true, draft: this.newDraft(v) }) };
+      }),
+      openNew: () => this.setState({ newOpen: true, draft: this.newDraft() }),
+      newOpen: s.newOpen, draft, closeNew: () => this.setState({ newOpen: false }),
+      closeNewBackdrop: e => { if (e.target === e.currentTarget) this.setState({ newOpen: false }); },
+      onDraftTitle: e => this.setDraft({ title: e.target.value }), onDraftDesc: e => this.setDraft({ description: e.target.value }),
+      onDraftStatus: e => this.setDraft({ status: e.target.value }), onDraftPriority: e => this.setDraft({ priority: e.target.value }),
+      onDraftAssignee: e => this.setDraft({ assignee: e.target.value }), onDraftDue: e => this.setDraft({ due: e.target.value }),
+      draftInvalid: !draft.title.trim(),
+      aiDraft: () => this.aiDraftRun(), aiDisabled: s.aiBusy || !draft.title.trim(), aiLabel: s.aiBusy ? 'Drafting…' : 'Draft with AI',
+      aiHint: draft.title.trim() ? 'Write a description, checklist and priority from the title.' : 'Type a title, then let AI draft the details.',
+      createTask: e => {
+        e.preventDefault(); if (!draft.title.trim()) return;
+        const n = 100 + s.tasks.length * 7 + Math.floor(Math.random() * 50);
+        this.setState(st => ({ newOpen: false, tasks: [{ ...draft, title: draft.title.trim(), id: 't' + Date.now(), key: 'TM-' + n, projectId: proj.id, createdBy: 'u1', created: 'Oct 21', comments: [] }, ...st.tasks] }));
+        this.say('Task created');
+      },
+      hasDetail: !!detail, detail: detail || {}, closeDetail: () => this.setState({ openId: null }),
+      commentDraft: s.commentDraft, onCommentDraft: e => this.setState({ commentDraft: e.target.value }), commentEmpty: !s.commentDraft.trim(),
+      memberOpts: s.memberIds.map(id => ({ id, name: uname(id) })),
+      canManage, isMember: !canManage, isOwner, notOwner: !isOwner,
+      inviteEmail: s.inviteEmail, inviteRole: s.inviteRole, inviteInvalid: !validEmail,
+      onInviteEmail: e => this.setState({ inviteEmail: e.target.value }), onInviteRole: e => this.setState({ inviteRole: e.target.value }),
+      sendInvite: e => { e.preventDefault(); if (!validEmail) return; this.setState(st => ({ invites: [{ id: 'i' + Date.now(), email: st.inviteEmail, role: st.inviteRole, sent: 'Oct 21', expires: 'In 7 days' }, ...st.invites], inviteEmail: '' })); this.say('Invitation sent to ' + s.inviteEmail); },
+      memberRows: members, memberCount: members.length,
+      inviteRows: s.invites.map(i => ({ ...i, roleLabel: RL[i.role], expColor: i.expires === 'Expired' ? 'var(--tm-danger)' : 'inherit',
+        onRevoke: () => { this.setState(st => ({ invites: st.invites.filter(x => x.id !== i.id) })); this.say('Invitation revoked'); },
+        onResend: () => { this.setState(st => ({ invites: st.invites.map(x => x.id === i.id ? { ...x, sent: 'Oct 21', expires: 'In 7 days' } : x) })); this.say('Invitation resent to ' + i.email); } })),
+      inviteCount: s.invites.length, hasInvites: s.invites.length > 0, noInvites: s.invites.length === 0,
+      onProjName: e => this.setState(st => ({ projects: st.projects.map(p => p.id === proj.id ? { ...p, name: e.target.value } : p) })),
+      onProjDesc: e => this.setState(st => ({ projects: st.projects.map(p => p.id === proj.id ? { ...p, description: e.target.value } : p) })),
+      saveProject: () => this.say('Project saved'),
+      askDelete: () => this.setState({ confirmDelete: true, deleteText: '' }), cancelDelete: () => this.setState({ confirmDelete: false }),
+      confirmDelete: s.confirmDelete, deleteText: s.deleteText, onDeleteText: e => this.setState({ deleteText: e.target.value }),
+      deleteMismatch: s.deleteText !== proj.name, projTaskCount: pt.length,
+      confirmDeleteProject: () => {
+        const name = proj.name;
+        this.setState(st => {
+          let ps = st.projects.filter(p => p.id !== proj.id);
+          if (!ps.length) ps = [{ id: 'p' + Date.now(), name: 'Untitled project', description: 'Add a short description.' }];
+          return { projects: ps, tasks: st.tasks.filter(t => t.projectId !== proj.id), projectId: ps[0].id, confirmDelete: false, view: 'list' };
+        });
+        this.say('“' + name + '” deleted');
+      },
+      leaveProject: () => this.say('Leave project — confirmation would follow'),
+      profileName: s.profileName, onProfileName: e => this.setState({ profileName: e.target.value }),
+      saveProfile: () => this.say('Profile saved'), savePassword: () => this.say('Password updated'),
+      roleSwatches: [['Ground', '--color-bg'], ['Surface', '--color-surface'], ['Ink', '--color-text'], ['Divider', '--color-divider'], ['Accent', '--color-accent'], ['Danger', '--tm-danger']].map(([name, t]) => ({ name, token: t, v: `var(${t})` })),
+      ramps: ['accent', 'neutral'].map(r => ({ name: r === 'accent' ? 'Accent (teal)' : 'Neutral', steps: [100, 200, 300, 400, 500, 600, 700, 800, 900].map(n => ({ n, v: `var(--color-${r}-${n})` })) })),
+      typeScale: [['h1 · 42 / 800', '42px', 800, 'Website relaunch'], ['h2 · 32 / 800', '32px', 800, 'Project title'], ['h4 · 20 / 800', '20px', 800, 'Section heading'], ['task · 16 / 600', '16px', 600, 'Finalise homepage hero copy'], ['body · 15 / 400', '15px', 400, 'Tighten the headline to under eight words.'], ['meta · 12 / 400', '12px', 400, 'TM-101 · Due Oct 23']].map(([spec, size, weight, sample]) => ({ spec, size, weight, sample })),
+      spaces: [1, 2, 3, 4, 6, 8].map(n => ({ label: `--space-${n} · ${[0, 4, 8, 12, 16, 0, 24, 0, 32][n]}px`, v: `var(--space-${n})` }))
+    };
+  }
+}
+</script>
+</body>
+</html>

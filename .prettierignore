@@ -1,0 +1,22 @@
+# Claude Design export — reference only
+design/prototype/
+
+# Vendored design-system sheets — kept byte-close to upstream so they can be diffed
+src/styles/modernist.css
+src/styles/taskmaster-tokens.css
+
+# Generated / installed
+.next/
+out/
+build/
+coverage/
+node_modules/
+next-env.d.ts
+package-lock.json
+*.tsbuildinfo
+
+# Not part of the app
+local_docs/
+
+# Hand-written design doc — keep its compact tables as authored
+docs/DESIGN.md

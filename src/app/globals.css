@@ -1,0 +1,158 @@
+/*
+ * Global styles.
+ *
+ * Cascade layers, lowest to highest priority:
+ *   theme      Tailwind's theme variables
+ *   base       Tailwind preflight
+ *   modernist  Modernist styles.css + TaskMaster tokens (design system base + component classes)
+ *   components (reserved for app component CSS)
+ *   utilities  Tailwind utilities
+ *
+ * Modernist sits above preflight so its element styles (headings, buttons, inputs, body type)
+ * win over the reset, and below utilities so a Tailwind class can still adjust a `.btn` or `h2`.
+ * The first @layer statement fixes this order; Tailwind's own statement inside `tailwindcss`
+ * only re-declares layers that already exist.
+ */
+@layer theme, base, modernist, components, utilities;
+
+@import '../styles/modernist.css' layer(modernist);
+@import '../styles/taskmaster-tokens.css' layer(modernist);
+@import 'tailwindcss';
+
+/* Tailwind scans the whole repo by default; keep the prototype export and docs out of it. */
+@source not '../../design';
+@source not '../../docs';
+
+@layer modernist {
+    /* Archivo is self-hosted by next/font (src/app/fonts.ts), which sets --font-archivo on <html>. */
+    :root {
+        --font-heading: var(--font-archivo), system-ui, sans-serif;
+        --font-body: var(--font-archivo), system-ui, sans-serif;
+    }
+
+    /* App-level additions carried over from the prototype's page <style>. */
+    .btn,
+    .seg-opt {
+        white-space: nowrap;
+        flex: none;
+    }
+    .seg {
+        flex: none;
+    }
+    a {
+        color: var(--color-accent-700);
+    }
+    a:hover {
+        color: var(--color-accent-600);
+    }
+}
+
+/* Dark mode follows next-themes' data-theme attribute on <html>. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * Port of design/prototype/tailwind.config.js. Every value points at a Modernist / TaskMaster
+ * CSS variable, so `inline` is required: utilities emit the token (`var(--color-bg)`) directly
+ * instead of a Tailwind variable of the same name, which would refer to itself.
+ * The `*: initial` lines drop Tailwind's defaults, as the config replaced (not extended) them.
+ */
+@theme inline {
+    --color-*: initial;
+    --color-transparent: transparent;
+    --color-current: currentColor;
+    --color-bg: var(--color-bg);
+    --color-surface: var(--color-surface);
+    --color-text: var(--color-text);
+    --color-divider: var(--color-divider);
+    --color-danger: var(--tm-danger);
+    --color-accent: var(--color-accent);
+    --color-accent-100: var(--color-accent-100);
+    --color-accent-200: var(--color-accent-200);
+    --color-accent-300: var(--color-accent-300);
+    --color-accent-400: var(--color-accent-400);
+    --color-accent-500: var(--color-accent-500);
+    --color-accent-600: var(--color-accent-600);
+    --color-accent-700: var(--color-accent-700);
+    --color-accent-800: var(--color-accent-800);
+    --color-accent-900: var(--color-accent-900);
+    --color-neutral-100: var(--color-neutral-100);
+    --color-neutral-200: var(--color-neutral-200);
+    --color-neutral-300: var(--color-neutral-300);
+    --color-neutral-400: var(--color-neutral-400);
+    --color-neutral-500: var(--color-neutral-500);
+    --color-neutral-600: var(--color-neutral-600);
+    --color-neutral-700: var(--color-neutral-700);
+    --color-neutral-800: var(--color-neutral-800);
+    --color-neutral-900: var(--color-neutral-900);
+    --color-prio-high: var(--tm-prio-high);
+    --color-prio-medium: var(--tm-prio-medium);
+    --color-prio-low: var(--tm-prio-low);
+
+    --font-*: initial;
+    --font-heading: var(--font-heading);
+    --font-body: var(--font-body);
+
+    --text-*: initial;
+    --text-xs: 11px;
+    --text-xs--line-height: 1.4;
+    --text-sm: 13px;
+    --text-sm--line-height: 1.5;
+    --text-base: 15px;
+    --text-base--line-height: 1.55;
+    --text-h5: 16px;
+    --text-h5--line-height: 1.2;
+    --text-h4: 20px;
+    --text-h4--line-height: 1.12;
+    --text-h3: 25px;
+    --text-h3--line-height: 1.12;
+    --text-h2: 32px;
+    --text-h2--line-height: 1.12;
+    --text-h1: 42px;
+    --text-h1--line-height: 1.12;
+
+    --spacing-*: initial;
+    --spacing-0: 0px;
+    --spacing-1: var(--space-1);
+    --spacing-2: var(--space-2);
+    --spacing-3: var(--space-3);
+    --spacing-4: var(--space-4);
+    --spacing-6: var(--space-6);
+    --spacing-8: var(--space-8);
+    --spacing-12: 48px;
+
+    --shadow-*: initial;
+    --shadow-sm: var(--shadow-sm);
+    --shadow-md: var(--shadow-md);
+    --shadow-lg: var(--shadow-lg);
+
+    --radius-*: initial;
+    --radius-none: 0;
+    --radius: 0;
+
+    --breakpoint-sm: 376px;
+    --breakpoint-md: 820px;
+    --breakpoint-lg: 1200px;
+}
+
+/* borderWidth.rule (2px) — Tailwind v4 has no border-width theme namespace. */
+@utility border-rule {
+    border-width: 2px;
+}
+@utility border-t-rule {
+    border-top-width: 2px;
+}
+@utility border-r-rule {
+    border-right-width: 2px;
+}
+@utility border-b-rule {
+    border-bottom-width: 2px;
+}
+@utility border-l-rule {
+    border-left-width: 2px;
+}
+@utility border-x-rule {
+    border-inline-width: 2px;
+}
+@utility border-y-rule {
+    border-block-width: 2px;
+}

@@ -1,0 +1,33 @@
+/* TaskMaster tokens — load AFTER Modernist styles.css. Teal accent + dark theme.
+   Theme switch: set data-theme="light" | "dark" on <html> (or any wrapper). */
+:root, [data-theme="light"] {
+  --color-accent: #0f8a80;
+  --color-accent-100: #e9f7f5; --color-accent-200: #cdeee9; --color-accent-300: #a3ded6;
+  --color-accent-400: #5fc3b7; --color-accent-500: #179e92; --color-accent-600: #0c7f75;
+  --color-accent-700: #08645c; --color-accent-800: #0a4a44; --color-accent-900: #0b302d;
+  --color-accent-2: var(--color-accent);
+  --color-accent-2-100: var(--color-accent-100); --color-accent-2-500: var(--color-accent-500);
+  --color-accent-2-800: var(--color-accent-800);
+  /* semantic */
+  --tm-prio-high: var(--color-accent);
+  --tm-prio-medium: var(--color-text);
+  --tm-prio-low: var(--color-neutral-400);
+  --tm-danger: #b3261e;
+}
+[data-theme="dark"] {
+  --color-bg: #191817;
+  --color-surface: #242321;
+  --color-text: #eeecea;
+  --color-divider: color-mix(in srgb, #eeecea 34%, transparent);
+  --color-accent: #2fb5a8;
+  --color-accent-100: #0b302d; --color-accent-200: #0a4a44; --color-accent-300: #08645c;
+  --color-accent-400: #0c7f75; --color-accent-500: #179e92; --color-accent-600: #45c3b6;
+  --color-accent-700: #7dd6cc; --color-accent-800: #b5e9e2; --color-accent-900: #e2f6f3;
+  --color-neutral-100: #2d2b2b; --color-neutral-200: #383535; --color-neutral-300: #4a4747;
+  --color-neutral-400: #605d5d; --color-neutral-500: #7d7979; --color-neutral-600: #9b9797;
+  --color-neutral-700: #bab6b6; --color-neutral-800: #d7d3d3; --color-neutral-900: #f1eded;
+  --shadow-sm: 0 0 0 1px #ffffff14, 0 1px 2px #00000066;
+  --shadow-md: 0 0 0 1px #ffffff14, 0 4px 12px #00000080;
+  --shadow-lg: 0 0 0 1px #ffffff1a, 0 14px 36px #00000099;
+  --tm-danger: #f2766c;
+}
