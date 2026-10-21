@@ -1,8 +1,11 @@
 import createClient, { removeTrailingSlash, type Middleware } from 'openapi-fetch';
 
+import { sessionEnded } from '@/lib/auth/sessionEnded';
+import { refreshSession } from '@/lib/auth/refresh';
+import { sessionStore, validAccessToken } from '@/lib/auth/store';
 import { env } from '@/lib/env';
 
-import { isApiError, networkError, toApiError } from './errors';
+import { ERROR_CODES, isApiError, networkError, toApiError } from './errors';
 import type { PageMeta, paths } from './types';
 
 /** Returns the current access token, or null when signed out. */
@@ -12,12 +15,27 @@ type ApiClientOptions = {
     /** API origin, e.g. http://localhost:3000. The spec's paths already start with /api/v1. */
     baseUrl: string;
     getAccessToken: AccessTokenGetter;
+    /**
+     * Called on 401 TOKEN_EXPIRED with the token the request was sent with. Resolve to a token
+     * to retry with, or null to give up. Omit to disable refresh-and-retry.
+     */
+    onTokenExpired?: (staleToken: string | null) => Promise<string | null>;
+    /** Called when a 401 can't be recovered: the session is over. */
+    onUnauthorized?: () => void;
 };
 
 const isAbort = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
 
+/** This app's own auth route handlers — never refreshed or retried (they *are* the refresh). */
+const isAuthRoute = (url: string) => new URL(url).pathname.startsWith('/api/auth/');
+
 /** Typed openapi-fetch client for the TaskMaster API. */
-export function createApiClient({ baseUrl, getAccessToken }: ApiClientOptions) {
+export function createApiClient({
+    baseUrl,
+    getAccessToken,
+    onTokenExpired,
+    onUnauthorized,
+}: ApiClientOptions) {
     const client = createClient<paths>({
         baseUrl: removeTrailingSlash(baseUrl),
         // Look fetch up per request (openapi-fetch otherwise captures it once at creation),
@@ -25,27 +43,54 @@ export function createApiClient({ baseUrl, getAccessToken }: ApiClientOptions) {
         fetch: (request) => globalThis.fetch(request),
     });
 
+    /**
+     * Per request (by openapi-fetch's request id): an unsent copy — fetch consumes the
+     * original's body, so a POST/PATCH can only be retried from a clone — and the token used.
+     */
+    const pending = new Map<string, { retry: Request; token: string | null }>();
+
     const auth: Middleware = {
-        async onRequest({ request }) {
-            if (request.headers.has('Authorization')) return request;
-            const token = await getAccessToken();
-            if (token) request.headers.set('Authorization', `Bearer ${token}`);
+        async onRequest({ request, id }) {
+            let token: string | null = null;
+            if (!request.headers.has('Authorization')) {
+                token = await getAccessToken();
+                if (token) request.headers.set('Authorization', `Bearer ${token}`);
+            }
+            if (onTokenExpired && !isAuthRoute(request.url)) {
+                pending.set(id, { retry: request.clone(), token });
+            }
             return request;
         },
 
-        // ── Extension point (step 4b, DESIGN.md §3) ─────────────────────────────────────
-        // async onResponse({ request, response }) {
-        //   On 401 with code TOKEN_EXPIRED: await the single-flight refresh (shared by
-        //   concurrent 401s in this tab, Web Locks across tabs), then retry `request` once
-        //   with the new token and return that response. Any other 401, or a failed
-        //   refresh → clear the session and redirect to /login?next=<path>.
-        // },
-        // ────────────────────────────────────────────────────────────────────────────────
+        // Refresh-and-retry (DESIGN.md §3).
+        async onResponse({ request, response, id }) {
+            const entry = pending.get(id);
+            pending.delete(id);
+            if (response.status !== 401 || !entry || isAuthRoute(request.url)) return undefined;
 
-        onError({ error }) {
+            const error = await toApiError(response.clone());
+            if (error.code === ERROR_CODES.TOKEN_EXPIRED && onTokenExpired) {
+                const token = await onTokenExpired(entry.token);
+                if (token) {
+                    entry.retry.headers.set('Authorization', `Bearer ${token}`);
+                    // Sent with fetch directly, not through this middleware: a retry is never
+                    // retried again.
+                    const retried = await globalThis.fetch(entry.retry);
+                    if (retried.status === 401) onUnauthorized?.();
+                    return retried;
+                }
+            }
+
+            // Any other 401, or no token to retry with: the session is over.
+            onUnauthorized?.();
+            return undefined;
+        },
+
+        onError({ error, id }) {
+            pending.delete(id);
             // fetch() rejected: no response at all. Cancellations stay as they are so
             // TanStack Query can recognise them.
-            if (isAbort(error)) return;
+            if (isAbort(error)) return undefined;
             return networkError(error);
         },
     };
@@ -56,17 +101,25 @@ export function createApiClient({ baseUrl, getAccessToken }: ApiClientOptions) {
 
 export type ApiClient = ReturnType<typeof createApiClient>;
 
-let accessTokenGetter: AccessTokenGetter = () => null;
+const storeToken: AccessTokenGetter = () => sessionStore.get().accessToken;
+let accessTokenGetter: AccessTokenGetter = storeToken;
 
-/** Plug in the session's token source (step 4b). Until then requests go out unauthenticated. */
-export function setAccessTokenGetter(getter: AccessTokenGetter) {
+/** Replace the token source (tests). Defaults to the session store's in-memory token. */
+export function setAccessTokenGetter(getter: AccessTokenGetter = storeToken) {
     accessTokenGetter = getter;
 }
 
-/** The app's API client. */
+/** The app's API client, wired to the session: bearer token, refresh-and-retry, sign-out. */
 export const api = createApiClient({
     baseUrl: env.NEXT_PUBLIC_API_URL,
     getAccessToken: () => accessTokenGetter(),
+    async onTokenExpired(staleToken) {
+        // Another request may already have refreshed while this one was in flight.
+        const current = validAccessToken();
+        if (current && current !== staleToken) return current;
+        return refreshSession();
+    },
+    onUnauthorized: sessionEnded,
 });
 
 // ── result helpers ─────────────────────────────────────────────────────────────────────

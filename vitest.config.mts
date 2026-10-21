@@ -13,6 +13,9 @@ export default defineConfig({
     },
     test: {
         environment: 'jsdom',
+        // The app's origin (same as `npm run dev`), distinct from the API's :3000, so tests can
+        // tell same-origin /api/auth/* calls from API calls.
+        environmentOptions: { jsdom: { url: 'http://localhost:3001' } },
         setupFiles: ['./tests/setup.ts'],
         include: ['tests/unit/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
         css: false,

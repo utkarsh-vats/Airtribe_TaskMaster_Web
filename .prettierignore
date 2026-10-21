@@ -8,6 +8,7 @@ src/styles/taskmaster-tokens.css
 # Generated / installed
 src/lib/api/schema.d.ts
 .next/
+.next-verify/
 out/
 build/
 coverage/

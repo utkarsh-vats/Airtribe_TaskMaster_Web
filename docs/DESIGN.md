@@ -52,11 +52,12 @@ Browser ──(Bearer accessToken)───────────────�
 ```
 
 - **Route handlers** (`app/api/auth/*`): `login`, `register`, `refresh`, `logout`, `logout-all`. They call the API server-side, put the refresh token in an `httpOnly; Secure (prod); SameSite=Lax; Path=/` cookie `tm_refresh` with the refresh TTL as `Max-Age`, and return only `{ accessToken, expiresIn, user }`.
-- **Access token** lives in memory only (React context). Lost on reload → restored by calling `/api/auth/refresh` (the cookie rides along).
+- **Access token** lives in memory only (a module-level store, `src/lib/auth/store.ts`, read with `useSyncExternalStore`). Lost on reload → restored by `SessionProvider` calling `/api/auth/refresh` (the cookie rides along). `SessionProvider` is mounted in the dashboard layout only, so visiting `/`, `/login` or `/register` never rotates the refresh token.
+- **Refresh outcomes:** 401 / 4xx → signed out. 5xx / network → nothing changes: a signed-in user stays signed in (and the proactive refresh retries in 30 s); a session being restored shows "Can't reach TaskMaster" with *Try again* instead of redirecting to `/login` (which would loop once the guard sends signed-in users back). The proactive refresh runs 60 s before `expiresAt` (or halfway for tokens shorter than 2 min).
 - **Single-flight refresh.** The backend treats a reused refresh token as theft and revokes every session. So:
   - within a tab, concurrent 401s share one refresh promise;
   - across tabs, the refresh call runs inside `navigator.locks.request('tm-refresh', …)`; the next tab to get the lock sends the already-rotated cookie.
-- **401 handling:** `TOKEN_EXPIRED` → refresh once and retry the request once. Any other 401, or a failed refresh → clear the session and go to `/login?next=<path>`.
+- **401 handling:** `TOKEN_EXPIRED` → refresh once and retry the request once (from a clone taken before sending, so POST/PATCH bodies survive; a retry is never retried). If another request already refreshed while this one was in flight, the retry reuses that token instead of refreshing again. Any other 401, or a failed refresh → clear the session and the query cache and go to `/login?next=<path>` (a full page load). `/api/auth/*` calls never go through this.
 - **Route guard:** `src/proxy.ts` (Next 16 renamed middleware to proxy). It only checks presence of the `tm_refresh` cookie; the API is the real authority.
   - `/dashboard/**` without the cookie → `/login?next=<path>`.
   - `/login` and `/register` with the cookie → `/dashboard`.

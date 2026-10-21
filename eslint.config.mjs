@@ -7,6 +7,7 @@ import tseslint from 'typescript-eslint';
 export default defineConfig([
     globalIgnores([
         '.next/**',
+        '.next-verify/**',
         'out/**',
         'build/**',
         'coverage/**',

@@ -19,7 +19,8 @@ const user = {
     updatedAt: '2026-10-01T09:00:00.000Z',
 };
 
-afterEach(() => setAccessTokenGetter(() => null));
+// Back to the default (the session store's token, null while signed out).
+afterEach(() => setAccessTokenGetter());
 
 /** Record the Authorization header of the next GET /users/me. */
 function captureAuthHeader() {
