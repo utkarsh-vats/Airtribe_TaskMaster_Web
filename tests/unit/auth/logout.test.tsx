@@ -333,13 +333,13 @@ describe('profile menu', () => {
         return u;
     }
 
-    it('shows the user and the items; Profile is disabled for now', async () => {
+    it('shows the user and the items', async () => {
         await openMenu();
 
         expect(screen.getByText(user.email)).toBeInTheDocument();
         expect(screen.getByRole('menuitem', { name: 'Profile' })).toHaveAttribute(
-            'aria-disabled',
-            'true',
+            'href',
+            '/dashboard/profile',
         );
         expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
     });

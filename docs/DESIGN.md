@@ -127,7 +127,7 @@ The prototype was built on demo data. Where it differs from the API, the API win
 
 ## 6. Layout and components
 
-**Shell (≥ 820 px):** header bar (brand, search, theme switch, notifications button with unread badge, profile button) over a 2-column body: sidebar (Projects list with active highlight, New project, then My tasks, Invitations with badge, Notifications) and `main`. **< 820 px:** sidebar becomes a drawer behind a menu button; project switching uses the prototype's select; search moves into the tasks toolbar.
+**Shell (≥ 820 px):** sticky header bar (brand, search, theme switch, notifications button with unread badge, profile menu). Search: on a project's task list or My tasks it sets `?q` in place (other params kept, page reset); anywhere else it opens My tasks with `?q`; `/` focuses it, Esc clears. The badge reads `meta.unreadCount` from `GET /notifications?unread=true&limit=1` (own query key, polled every 60 s while visible; SSE takes over in 12c), hidden at 0, `99+` above 99 over a 2-column body: sidebar (Projects list with active highlight, New project, then My tasks, Invitations with badge, Notifications) and `main`. **< 820 px:** sidebar becomes a drawer behind a menu button; project switching uses the prototype's select; search moves into the tasks toolbar.
 
 **Project header:** kicker "Project", role tag, name (h2), description, tabs: Tasks · Discussion · Files · Members · Settings (2px accent underline on the active tab, per prototype).
 

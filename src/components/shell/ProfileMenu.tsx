@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronDown, LogOut, MonitorSmartphone, UserRound } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -18,10 +19,7 @@ import {
 import { signOut, signOutEverywhere } from '@/lib/auth/actions';
 import { useSession } from '@/lib/auth/SessionProvider';
 
-/**
- * Temporary profile menu for the placeholder dashboard header (moves into the real header in
- * step 5a): avatar + first name, Profile (soon), Sign out, Sign out of all devices.
- */
+/** Header profile menu: avatar + first name; Profile, Sign out, Sign out of all devices. */
 export function ProfileMenu() {
     const { user } = useSession();
     const router = useRouter();
@@ -48,10 +46,14 @@ export function ProfileMenu() {
                     </Button>
                 </MenuTrigger>
                 <MenuContent>
-                    <MenuLabel>{user.email}</MenuLabel>
-                    <MenuItem disabled title="Coming soon">
-                        <UserRound aria-hidden size={14} />
-                        Profile
+                    <MenuLabel className="truncate tracking-normal normal-case">
+                        {user.email}
+                    </MenuLabel>
+                    <MenuItem asChild>
+                        <Link href="/dashboard/profile" className="text-text no-underline">
+                            <UserRound aria-hidden size={14} />
+                            Profile
+                        </Link>
                     </MenuItem>
                     <MenuSeparator />
                     <MenuItem

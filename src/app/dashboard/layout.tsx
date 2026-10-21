@@ -1,21 +1,15 @@
 import type { ReactNode } from 'react';
 
-import { BrandMark } from '@/components/shell/BrandMark';
-import { ProfileMenu } from '@/components/shell/ProfileMenu';
-import { ThemeSwitch } from '@/components/shell/ThemeSwitch';
+import { DashboardHeader } from '@/components/shell/DashboardHeader';
 import { SessionProvider } from '@/lib/auth/SessionProvider';
 
-// Placeholder shell — the real header, sidebar and mobile drawer come in step 5.
 // SessionProvider restores the session (or redirects to /login) before any of it renders.
+// The sidebar and mobile drawer are placeholders until step 5b.
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     return (
         <SessionProvider>
             <div className="flex min-h-screen flex-col">
-                <header className="nav gap-3">
-                    <BrandMark href="/dashboard" />
-                    <ThemeSwitch />
-                    <ProfileMenu />
-                </header>
+                <DashboardHeader />
                 <div className="grid flex-1 grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)]">
                     <aside
                         aria-label="Sidebar"

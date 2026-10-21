@@ -119,5 +119,7 @@ export const queryKeys = {
         all: () => ['notifications'] as const,
         list: (filters?: NotificationListFilters) =>
             [...queryKeys.notifications.all(), 'list', normalizeFilters(filters)] as const,
+        /** The header badge's count (meta.unreadCount) — its own entry, not a list page. */
+        unreadCount: () => [...queryKeys.notifications.all(), 'unread-count'] as const,
     },
 } as const;
