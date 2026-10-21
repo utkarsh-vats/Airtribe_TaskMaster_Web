@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 
 import { Toaster } from '@/components/ui/Toaster';
 import { TooltipProvider } from '@/components/ui/Tooltip';
+import { AuthBroadcastListener } from '@/lib/auth/AuthBroadcastListener';
 import { getQueryClient } from '@/lib/query/client';
 
 // Development only. The condition is fixed at build time, so production bundles drop the import
@@ -34,6 +35,7 @@ export function Providers({ children }: { children: ReactNode }) {
                 <TooltipProvider delayDuration={300}>
                     {children}
                     <Toaster />
+                    <AuthBroadcastListener />
                 </TooltipProvider>
             </ThemeProvider>
             <ReactQueryDevtools buttonPosition="bottom-right" />

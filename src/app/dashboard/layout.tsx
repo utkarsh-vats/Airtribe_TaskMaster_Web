@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { BrandMark } from '@/components/shell/BrandMark';
+import { ProfileMenu } from '@/components/shell/ProfileMenu';
 import { ThemeSwitch } from '@/components/shell/ThemeSwitch';
 import { SessionProvider } from '@/lib/auth/SessionProvider';
 
@@ -13,6 +14,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <header className="nav gap-3">
                     <BrandMark href="/dashboard" />
                     <ThemeSwitch />
+                    <ProfileMenu />
                 </header>
                 <div className="grid flex-1 grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)]">
                     <aside

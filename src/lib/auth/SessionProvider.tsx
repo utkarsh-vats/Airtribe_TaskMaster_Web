@@ -6,6 +6,7 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 
+import { isSigningOut } from './actions';
 import { currentPath, loginUrl } from './navigation';
 import { refreshSession } from './refresh';
 import { sessionStore, type SessionState } from './store';
@@ -48,7 +49,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }, []);
 
     useEffect(() => {
-        if (session.status === 'unauthenticated') router.replace(loginUrl(currentPath()));
+        // A deliberate sign-out navigates by itself (to /login, without `next`).
+        if (session.status === 'unauthenticated' && !isSigningOut()) {
+            router.replace(loginUrl(currentPath()));
+        }
     }, [session.status, router]);
 
     if (session.status === 'authenticated') return children;

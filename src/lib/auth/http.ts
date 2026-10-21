@@ -42,10 +42,10 @@ export function passThrough(result: BackendResult): NextResponse {
     const response = envelopeSchema.safeParse(result.body).success
         ? json(result.status, result.body)
         : errorResponse(
-            result.status,
-            ERROR_CODES.INTERNAL_ERROR,
-            'Unexpected response from the API.',
-        );
+              result.status,
+              ERROR_CODES.INTERNAL_ERROR,
+              'Unexpected response from the API.',
+          );
     for (const name of FORWARDED_HEADERS) {
         const value = result.headers.get(name);
         if (value) response.headers.set(name, value);

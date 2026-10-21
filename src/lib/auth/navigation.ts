@@ -8,12 +8,18 @@ export function currentPath(): string {
     return `${window.location.pathname}${window.location.search}`;
 }
 
+/** A navigation function: router.replace from a component, or a full page load. */
+export type Navigate = (path: string) => void;
+
 /**
- * Full navigation to /login. An object (not a bare function) so tests can spy on it.
- * A full load, rather than a client-side push, also drops any in-memory state left behind.
+ * Full page loads for code outside React. An object (not bare functions) so tests can spy on
+ * it. A full load, rather than a client-side push, also drops any in-memory state left behind.
  */
 export const authNavigation = {
-    toLogin(next: string) {
-        window.location.assign(loginUrl(next));
+    assign(path: string) {
+        window.location.assign(path);
+    },
+    toLogin(next?: string) {
+        authNavigation.assign(loginUrl(next));
     },
 };
