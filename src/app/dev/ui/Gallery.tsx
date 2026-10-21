@@ -140,7 +140,7 @@ export function Gallery() {
                 <ThemeSwitch />
             </header>
 
-            <main className="flex w-full max-w-[1100px] flex-col gap-8 p-4 md:p-6">
+            <main className="mx-auto flex w-full max-w-[1100px] flex-col gap-8 p-4 md:p-6">
                 <div>
                     <div className="card-kicker text-accent-700">Dev</div>
                     <h2 className="m-0">UI kit</h2>

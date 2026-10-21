@@ -18,6 +18,7 @@
 @import '../styles/modernist.css' layer(modernist);
 @import '../styles/taskmaster-tokens.css' layer(modernist);
 @import '../styles/ui.css' layer(components);
+@import '../styles/hero-graphic.css' layer(components);
 @import 'tailwindcss';
 
 /* Tailwind scans the whole repo by default; keep the prototype export and docs out of it. */

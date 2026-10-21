@@ -1,0 +1,100 @@
+/*
+ * HeroGraphic (src/components/shell/HeroGraphic.tsx): the drifting task board behind the accent
+ * hero panels. Every colour is --color-bg (the panel's text colour) mixed toward transparent,
+ * so it works in both themes. Strokes stay 1px at any scale (non-scaling-stroke).
+ * Only transform and opacity animate.
+ */
+.hero-graphic {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    color: var(--color-bg);
+}
+/* Below 820px the board can't avoid the headline, so it steps back further. */
+@media (max-width: 819px) {
+    .hero-graphic {
+        opacity: 0.65;
+    }
+}
+.hero-graphic * {
+    vector-effect: non-scaling-stroke;
+    stroke-width: 1px;
+    fill: none;
+}
+
+.hg-grid {
+    stroke: color-mix(in srgb, currentColor 8%, transparent);
+}
+.hg-col,
+.hg-card,
+.hg-mark {
+    stroke: color-mix(in srgb, currentColor 22%, transparent);
+}
+.hg-rule {
+    stroke: color-mix(in srgb, currentColor 25%, transparent);
+}
+.hg-line {
+    stroke: color-mix(in srgb, currentColor 16%, transparent);
+}
+.hero-graphic .hg-card-filled {
+    fill: color-mix(in srgb, currentColor 10%, transparent);
+}
+.hero-graphic .hg-label {
+    fill: color-mix(in srgb, currentColor 25%, transparent);
+    stroke: none;
+    font-family: var(--font-heading);
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+}
+
+/*
+ * One loop: fade in at To do, wait, slide to In progress, wait, slide to Done, wait, fade out,
+ * then restart at To do. Duration and (negative) delay are set per card inline.
+ */
+.hg-mover {
+    animation-name: hg-move;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+}
+@keyframes hg-move {
+    0% {
+        opacity: 0;
+        transform: translateX(0);
+    }
+    6% {
+        opacity: 1;
+    }
+    28% {
+        transform: translateX(0);
+        animation-timing-function: ease-in-out;
+    }
+    40% {
+        transform: translateX(var(--hg-step));
+    }
+    60% {
+        transform: translateX(var(--hg-step));
+        animation-timing-function: ease-in-out;
+    }
+    72% {
+        transform: translateX(calc(2 * var(--hg-step)));
+    }
+    92% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(calc(2 * var(--hg-step)));
+    }
+}
+
+/* Reduced motion: no animation; each moving card rests in its own column. */
+@media (prefers-reduced-motion: reduce) {
+    .hg-mover {
+        animation: none;
+        transform: translateX(var(--hg-rest));
+    }
+}

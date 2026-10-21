@@ -1,9 +1,15 @@
 import type { ReactNode } from 'react';
 
 /** The prototype's display statement: "Tasks, in order." at poster size, plus a pitch line. */
-export function HeroStatement({ children }: { children?: ReactNode }) {
+export function HeroStatement({
+    children,
+    className,
+}: {
+    children?: ReactNode;
+    className?: string;
+}) {
     return (
-        <div>
+        <div className={className}>
             <p className="m-0 font-heading text-[clamp(44px,7vw,88px)] leading-[0.95] font-extrabold tracking-[-0.03em]">
                 Tasks,
                 <br />
