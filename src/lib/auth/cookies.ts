@@ -4,7 +4,7 @@ import type { NextResponse } from 'next/server';
 
 import { serverEnv } from '@/lib/env.server';
 
-import { REFRESH_COOKIE } from './hasSession';
+import { REFRESH_COOKIE } from './constants';
 
 export { REFRESH_COOKIE };
 

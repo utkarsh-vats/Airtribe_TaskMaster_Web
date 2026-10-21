@@ -58,11 +58,12 @@ Browser ──(Bearer accessToken)───────────────�
   - within a tab, concurrent 401s share one refresh promise;
   - across tabs, the refresh call runs inside `navigator.locks.request('tm-refresh', …)`; the next tab to get the lock sends the already-rotated cookie.
 - **401 handling:** `TOKEN_EXPIRED` → refresh once and retry the request once (from a clone taken before sending, so POST/PATCH bodies survive; a retry is never retried). If another request already refreshed while this one was in flight, the retry reuses that token instead of refreshing again. Any other 401, or a failed refresh → clear the session and the query cache and go to `/login?next=<path>` (a full page load). `/api/auth/*` calls never go through this.
-- **Route guard:** `src/proxy.ts` (Next 16 renamed middleware to proxy). It only checks presence of the `tm_refresh` cookie; the API is the real authority.
-  - `/dashboard/**` without the cookie → `/login?next=<path>`.
-  - `/login` and `/register` with the cookie → `/dashboard`.
+- **Route guard:** `src/proxy.ts` (Next 16 renamed middleware to proxy), matcher `/dashboard/:path*`, `/login`, `/register` only — never `/`, `/api`, `_next` or static files. It only checks that the `tm_refresh` cookie is present and non-empty; the API is the real authority.
+  - `/dashboard/**` without the cookie → 307 `/login?next=<path + query>`.
+  - `/login` and `/register` with the cookie → 307 `safeNext(?next)`.
   - `/` is never redirected — the marketing landing is reachable signed in or not.
-- **After login / register:** go to `next` if it is a same-origin path under `/dashboard` (starts with `/dashboard`, not `//`, no scheme); otherwise `/dashboard`.
+- **Safe `next`** (`src/lib/auth/safeNext.ts`, used by the guard and the login / register forms): kept only if, raw and decoded once, it is `/dashboard`, `/dashboard/…` or `/dashboard?…` with no leading `//`, backslash, scheme, control character or `.` / `..` segment, and the URL parser agrees it resolves under `/dashboard`; otherwise `/dashboard`. The query string is preserved.
+- **Stale cookie, no loop:** `/login` with a stale cookie → `/dashboard` → `SessionProvider`'s restore gets a 401 → the refresh route clears the cookie → client goes to `/login?next=…` → no cookie, so `/login` renders. If the API is unreachable the refresh route keeps the cookie and `SessionProvider` shows *Try again* rather than redirecting, so that path can't loop either (`tests/unit/auth/guardLoop.test.tsx` walks both).
 - **Server-side session check:** `src/lib/auth/hasSession.ts` (cookie presence via `next/headers`) — used by the marketing header to show "Go to dashboard" and reused by the guard logic.
 - **Logout:** `/api/auth/logout` sends the refresh token to the API, clears the cookie; the client drops the access token and the query cache. **Log out everywhere** uses `/api/auth/logout-all` with the current access token.
 - **Change password** revokes all refresh tokens on the API, so the UI signs out and sends the user to log in again with a toast explaining why.
