@@ -15,7 +15,7 @@ export function HeroStatement({
                 <br />
                 in order.
             </p>
-            <p className="mt-4 mb-0 max-w-[34ch] text-[16px]">
+            <p className="mt-4 mb-0 max-w-[34ch] text-[19px] font-semibold">
                 Projects, boards and teammates in one place. Nothing extra.
             </p>
             {children}
