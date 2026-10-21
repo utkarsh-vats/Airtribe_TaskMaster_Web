@@ -1,0 +1,411 @@
+/*
+ * UI kit styles (src/components/ui/) that Modernist doesn't provide. Imported into the
+ * `components` layer: above Modernist, below Tailwind utilities.
+ * Rules carried over: zero radius, 2px rules between sections, 1px between rows, accent focus
+ * ring from Modernist's :focus-visible, 45% opacity for disabled.
+ */
+
+/* — buttons — */
+.btn-sm {
+    font-size: 13px;
+    padding: var(--space-1) var(--space-2);
+}
+.btn-sm.btn-ghost {
+    padding-inline: var(--space-1);
+}
+.btn-sm.btn-icon {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+}
+.btn-primary.btn-danger {
+    background: var(--tm-danger);
+    color: var(--color-bg);
+}
+.btn-primary.btn-danger:hover {
+    background: color-mix(in srgb, var(--tm-danger) 85%, var(--color-text));
+}
+.btn-primary.btn-danger:active {
+    background: color-mix(in srgb, var(--tm-danger) 72%, var(--color-text));
+}
+.btn-secondary.btn-danger {
+    color: var(--tm-danger);
+    border-color: var(--tm-danger);
+}
+.btn-secondary.btn-danger:hover,
+.btn-ghost.btn-danger:hover {
+    background: color-mix(in srgb, var(--tm-danger) 10%, transparent);
+}
+.btn-ghost.btn-danger {
+    color: var(--tm-danger);
+}
+a.btn {
+    text-decoration: none;
+}
+/* Links styled as buttons: beat the global `a` / `.nav a` colours from the Modernist layer. */
+a.btn-secondary,
+a.btn-secondary:hover {
+    color: var(--color-text);
+}
+a.btn-primary,
+a.btn-primary:hover {
+    color: var(--color-bg);
+}
+a.btn-ghost,
+a.btn-ghost:hover {
+    color: var(--color-accent);
+}
+
+/* — form state — */
+.input[aria-invalid='true'] {
+    border-color: var(--tm-danger);
+}
+.input:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.input-autogrow {
+    resize: none;
+    overflow: hidden;
+}
+
+/* Checkbox, matching .radio's dot: a square with an inset fill when checked. */
+.check {
+    appearance: none;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: 1.5px solid var(--color-divider);
+    background: transparent;
+    cursor: pointer;
+}
+.check:hover {
+    border-color: var(--color-accent);
+}
+.check:checked {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    box-shadow: inset 0 0 0 3px var(--color-bg);
+}
+.check:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* — table rows that open something — */
+.table tbody tr.table-row-link {
+    cursor: pointer;
+}
+.table tbody tr.table-row-link:focus-visible {
+    outline-offset: -2px;
+}
+
+/* — dialog — */
+.tm-dialog-overlay {
+    z-index: 50;
+    overflow-y: auto;
+}
+.tm-dialog {
+    /* The prototype's dialogs sit on the page ground, not the surface fill. */
+    background: var(--color-bg);
+    max-height: calc(100dvh - 2 * var(--space-4));
+    overflow-y: auto;
+}
+.tm-dialog .dialog-title {
+    margin: 0;
+}
+.tm-dialog .dialog-body {
+    margin: 0;
+}
+
+/* — sheet / drawer — */
+.tm-sheet-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: color-mix(in srgb, var(--color-neutral-900) 40%, transparent);
+}
+.tm-sheet {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    background: var(--color-bg);
+    box-shadow: var(--shadow-lg);
+}
+.tm-sheet[data-side='right'] {
+    right: 0;
+    width: 100%;
+}
+@media (min-width: 820px) {
+    .tm-sheet[data-side='right'] {
+        width: min(560px, 100%);
+        border-left: 2px solid var(--color-divider);
+    }
+}
+.tm-sheet[data-side='left'] {
+    left: 0;
+    width: min(300px, 85vw);
+    border-right: 2px solid var(--color-divider);
+}
+.tm-sheet-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 2px solid var(--color-divider);
+    background: var(--color-bg);
+}
+.tm-sheet-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-4);
+}
+.tm-sheet-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-top: 2px solid var(--color-divider);
+}
+
+/* — floating layers: popover, menu, tooltip — */
+.tm-popover {
+    z-index: 60;
+    min-width: 220px;
+    max-width: calc(100vw - 2 * var(--space-4));
+    padding: var(--space-3);
+    background: var(--color-bg);
+    border: 2px solid var(--color-divider);
+    box-shadow: var(--shadow-lg);
+}
+.tm-menu {
+    z-index: 60;
+    min-width: 180px;
+    padding: var(--space-1) 0;
+    background: var(--color-bg);
+    border: 2px solid var(--color-divider);
+    box-shadow: var(--shadow-lg);
+}
+.tm-menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    font-size: 14px;
+    cursor: pointer;
+    outline: none;
+    user-select: none;
+}
+.tm-menu-item[data-highlighted] {
+    background: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+.tm-menu-item[data-disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.tm-menu-item[data-danger] {
+    color: var(--tm-danger);
+}
+.tm-menu-label {
+    padding: 6px var(--space-3);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.tm-menu-separator {
+    height: 1px;
+    margin: var(--space-1) 0;
+    background: var(--color-divider);
+}
+.tm-tooltip {
+    z-index: 60;
+    max-width: 260px;
+    padding: var(--space-1) var(--space-2);
+    font-size: 12px;
+    line-height: 1.4;
+    background: var(--color-text);
+    color: var(--color-bg);
+    box-shadow: var(--shadow-md);
+}
+
+/* MultiSelect option rows */
+.tm-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px var(--space-1);
+    font-size: 14px;
+    cursor: pointer;
+}
+.tm-option:hover {
+    background: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+
+/* — link tabs (project header) — */
+.tm-tabs {
+    display: flex;
+    gap: var(--space-4);
+    border-bottom: 2px solid var(--color-divider);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
+.tm-tab {
+    position: relative;
+    padding: 8px 2px 10px;
+    font-size: 14px;
+    white-space: nowrap;
+    color: inherit;
+    text-decoration: none;
+}
+.tm-tab:hover {
+    color: var(--color-accent-700);
+}
+.tm-tab[aria-current='page'] {
+    font-weight: 800;
+}
+.tm-tab[aria-current='page']::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: var(--color-accent);
+}
+.tm-tab:focus-visible {
+    outline-offset: -2px;
+}
+
+/* — avatar — */
+.avatar {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    overflow: hidden;
+    background: var(--color-neutral-300);
+    color: var(--color-neutral-900);
+    font-weight: 800;
+    line-height: 1;
+}
+.avatar-sm {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+}
+.avatar-md {
+    width: 32px;
+    height: 32px;
+    font-size: 11px;
+}
+.avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* — skeleton — */
+.skeleton {
+    display: block;
+    height: 1em;
+    background: var(--color-neutral-300);
+}
+
+/* — toasts (sonner, unstyled mode) — */
+.tm-toast {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: var(--width);
+    padding: 10px 14px;
+    font-family: var(--font-body);
+    font-size: 14px;
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: 2px solid var(--color-divider);
+    box-shadow: var(--shadow-lg);
+}
+.tm-toast[data-type='success'] {
+    border-color: var(--color-accent);
+}
+.tm-toast[data-type='error'] {
+    border-color: var(--tm-danger);
+}
+.tm-toast[data-type='error'] [data-icon] {
+    color: var(--tm-danger);
+}
+.tm-toast-content {
+    flex: 1;
+    min-width: 0;
+}
+.tm-toast-title {
+    font-weight: 600;
+}
+.tm-toast-description {
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+/* — motion — */
+@media (prefers-reduced-motion: no-preference) {
+    .tm-fade[data-state='open'] {
+        animation: tm-fade-in 150ms ease-out;
+    }
+    .tm-fade[data-state='closed'] {
+        animation: tm-fade-out 120ms ease-in;
+    }
+    .tm-sheet[data-side='right'][data-state='open'] {
+        animation: tm-slide-in-right 180ms ease-out;
+    }
+    .tm-sheet[data-side='right'][data-state='closed'] {
+        animation: tm-slide-out-right 150ms ease-in;
+    }
+    .tm-sheet[data-side='left'][data-state='open'] {
+        animation: tm-slide-in-left 180ms ease-out;
+    }
+    .tm-sheet[data-side='left'][data-state='closed'] {
+        animation: tm-slide-out-left 150ms ease-in;
+    }
+}
+@keyframes tm-fade-in {
+    from {
+        opacity: 0;
+    }
+}
+@keyframes tm-fade-out {
+    to {
+        opacity: 0;
+    }
+}
+@keyframes tm-slide-in-right {
+    from {
+        transform: translateX(100%);
+    }
+}
+@keyframes tm-slide-out-right {
+    to {
+        transform: translateX(100%);
+    }
+}
+@keyframes tm-slide-in-left {
+    from {
+        transform: translateX(-100%);
+    }
+}
+@keyframes tm-slide-out-left {
+    to {
+        transform: translateX(-100%);
+    }
+}

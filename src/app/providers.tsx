@@ -3,6 +3,9 @@
 import { ThemeProvider } from 'next-themes';
 import type { ReactNode } from 'react';
 
+import { Toaster } from '@/components/ui/Toaster';
+import { TooltipProvider } from '@/components/ui/Tooltip';
+
 export function Providers({ children }: { children: ReactNode }) {
     return (
         <ThemeProvider
@@ -12,7 +15,10 @@ export function Providers({ children }: { children: ReactNode }) {
             enableSystem
             disableTransitionOnChange
         >
-            {children}
+            <TooltipProvider delayDuration={300}>
+                {children}
+                <Toaster />
+            </TooltipProvider>
         </ThemeProvider>
     );
 }

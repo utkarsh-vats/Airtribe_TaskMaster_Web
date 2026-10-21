@@ -5,7 +5,7 @@
  *   theme      Tailwind's theme variables
  *   base       Tailwind preflight
  *   modernist  Modernist styles.css + TaskMaster tokens (design system base + component classes)
- *   components (reserved for app component CSS)
+ *   components UI kit CSS (src/styles/ui.css)
  *   utilities  Tailwind utilities
  *
  * Modernist sits above preflight so its element styles (headings, buttons, inputs, body type)
@@ -17,6 +17,7 @@
 
 @import '../styles/modernist.css' layer(modernist);
 @import '../styles/taskmaster-tokens.css' layer(modernist);
+@import '../styles/ui.css' layer(components);
 @import 'tailwindcss';
 
 /* Tailwind scans the whole repo by default; keep the prototype export and docs out of it. */
@@ -44,21 +45,6 @@
     }
     a:hover {
         color: var(--color-accent-600);
-    }
-
-    /* Modernist's `.nav a` (inherit colour, accent on hover) outranks the `.btn-*` colours;
-       restore them for links styled as buttons in a header. */
-    .nav a.btn,
-    .nav a.btn:hover {
-        color: var(--color-text);
-    }
-    .nav a.btn-primary,
-    .nav a.btn-primary:hover {
-        color: var(--color-bg);
-    }
-    .nav a.btn-ghost,
-    .nav a.btn-ghost:hover {
-        color: var(--color-accent);
     }
 }
 
