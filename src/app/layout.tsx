@@ -6,7 +6,7 @@ import { Providers } from './providers';
 import './globals.css';
 
 export const metadata: Metadata = {
-    title: 'TaskMaster',
+    title: { default: 'TaskMaster', template: '%s · TaskMaster' },
     description: 'Projects, tasks and the people doing them.',
 };
 

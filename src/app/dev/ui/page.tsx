@@ -1,20 +1,26 @@
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+
+import { BrandMark } from '@/components/shell/BrandMark';
 import { ThemeSwitch } from '@/components/shell/ThemeSwitch';
 
-// Placeholder for eyeballing the design tokens in both themes. Replaced in step 5.
-export default function HomePage() {
+export const metadata: Metadata = { title: 'UI' };
+
+// Dev-only token / component showcase (the prototype's "Tokens & components" view).
+// Step 2 grows this into the full UI kit page.
+export default function DevUiPage() {
+    if (process.env.NODE_ENV === 'production') notFound();
+
     return (
         <div className="flex min-h-screen flex-col">
             <header className="nav gap-3">
-                <div className="nav-brand flex items-center gap-2">
-                    <div aria-hidden className="h-[14px] w-[14px] bg-accent" />
-                    TaskMaster
-                </div>
+                <BrandMark />
                 <ThemeSwitch />
             </header>
 
             <main className="flex max-w-[1100px] flex-col gap-8 p-6">
                 <div className="border-b-rule border-divider pb-4">
-                    <div className="card-kicker text-accent-700">Step 1</div>
+                    <div className="card-kicker text-accent-700">Dev</div>
                     <h2 className="m-0">Tokens &amp; components</h2>
                     <p className="text-muted mt-2 mb-0 max-w-[70ch]">
                         Modernist base (Archivo, 0 radius, 2px rules) with the TaskMaster teal

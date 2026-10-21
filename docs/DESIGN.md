@@ -57,7 +57,12 @@ Browser ──(Bearer accessToken)───────────────�
   - within a tab, concurrent 401s share one refresh promise;
   - across tabs, the refresh call runs inside `navigator.locks.request('tm-refresh', …)`; the next tab to get the lock sends the already-rotated cookie.
 - **401 handling:** `TOKEN_EXPIRED` → refresh once and retry the request once. Any other 401, or a failed refresh → clear the session and go to `/login?next=<path>`.
-- **Route guard:** Next middleware (named `proxy` in newer Next versions — use whatever the installed version calls it) redirects to `/login` when there's no `tm_refresh` cookie, and away from `/login` when there is one. It only checks presence; the API is the real authority.
+- **Route guard:** `src/proxy.ts` (Next 16 renamed middleware to proxy). It only checks presence of the `tm_refresh` cookie; the API is the real authority.
+  - `/dashboard/**` without the cookie → `/login?next=<path>`.
+  - `/login` and `/register` with the cookie → `/dashboard`.
+  - `/` is never redirected — the marketing landing is reachable signed in or not.
+- **After login / register:** go to `next` if it is a same-origin path under `/dashboard` (starts with `/dashboard`, not `//`, no scheme); otherwise `/dashboard`.
+- **Server-side session check:** `src/lib/auth/hasSession.ts` (cookie presence via `next/headers`) — used by the marketing header to show "Go to dashboard" and reused by the guard logic.
 - **Logout:** `/api/auth/logout` sends the refresh token to the API, clears the cookie; the client drops the access token and the query cache. **Log out everywhere** uses `/api/auth/logout-all` with the current access token.
 - **Change password** revokes all refresh tokens on the API, so the UI signs out and sends the user to log in again with a toast explaining why.
 
@@ -67,21 +72,25 @@ Browser ──(Bearer accessToken)───────────────�
 
 ## 4. Routes
 
+Three areas, each with its own layout: **marketing** (`(marketing)` route group), **auth** (`(auth)` route group) and the signed-in app under **`/dashboard`**.
+
 | Route | Screen | Notes |
 |---|---|---|
-| `/login`, `/register` | Auth split screen (accent panel + form) | Prototype's segmented "Sign in / Create account" switch; `?next=` honoured |
-| `/` | → redirects to `/my-tasks` | |
-| `/my-tasks` | Tasks assigned to me across projects | Same filter bar minus assignee; each row shows its project |
-| `/projects` | Projects grid / list | Mobile entry point; on desktop the sidebar covers it |
-| `/projects/[projectId]` | → `/projects/[projectId]/tasks` | |
-| `/projects/[projectId]/tasks` | List or board (`?view=list|board`), filters in the URL, task panel via `?task=<id>` | |
-| `/projects/[projectId]/discussion` | Project-level comments | Not in prototype — same thread component as the task panel |
-| `/projects/[projectId]/files` | Project-level attachments | Not in prototype — same attachment list component |
-| `/projects/[projectId]/members` | Invite form, members table, invitations table | Per prototype |
-| `/projects/[projectId]/settings` | Project details, danger zone | Per prototype |
-| `/invitations` | Invitations sent to me — Accept / Decline | Not in prototype |
-| `/notifications` | Full notifications list | Header panel shows the latest 10 |
-| `/profile` | Profile, password, sign out | Per prototype, plus bio and avatar URL |
+| `/` | Marketing landing | Always reachable, signed in or not. Header shows "Sign in" / "Create account", or "Go to dashboard" when signed in. Currently a "Coming soon" page |
+| `/login`, `/register` | Auth split screen (accent panel + form) | Signed in → `/dashboard`. Prototype's segmented "Sign in / Create account" switch; `?next=` honoured |
+| `/dashboard` | → redirects to `/dashboard/my-tasks` | |
+| `/dashboard/my-tasks` | Tasks assigned to me across projects | Same filter bar minus assignee; each row shows its project |
+| `/dashboard/projects` | Projects grid / list | Mobile entry point; on desktop the sidebar covers it |
+| `/dashboard/projects/[projectId]` | → `/dashboard/projects/[projectId]/tasks` | |
+| `/dashboard/projects/[projectId]/tasks` | List or board (`?view=list|board`), filters in the URL, task panel via `?task=<id>` | |
+| `/dashboard/projects/[projectId]/discussion` | Project-level comments | Not in prototype — same thread component as the task panel |
+| `/dashboard/projects/[projectId]/files` | Project-level attachments | Not in prototype — same attachment list component |
+| `/dashboard/projects/[projectId]/members` | Invite form, members table, invitations table | Per prototype |
+| `/dashboard/projects/[projectId]/settings` | Project details, danger zone | Per prototype |
+| `/dashboard/invitations` | Invitations sent to me — Accept / Decline | Not in prototype |
+| `/dashboard/notifications` | Full notifications list | Header panel shows the latest 10 |
+| `/dashboard/profile` | Profile, password, sign out | Per prototype, plus bio and avatar URL |
+| `/dev/ui` | Component showcase | Dev only — `notFound()` in production |
 | not found | "Project not found" / generic 404 | The API returns 404 for projects you're not in |
 
 ---
@@ -98,7 +107,7 @@ The prototype was built on demo data. Where it differs from the API, the API win
 | Status select in "New task" | API creates every task as `OPEN`. The modal has no status field; "Add task" in a board column creates the task, then PATCHes its status |
 | Due date is a date input | Sent as end of that day in the user's timezone, ISO 8601 with offset (`2026-10-28T23:59:59+05:30`); displayed as a date |
 | Status filter with counts | Counts come from 4 `limit=1` list queries reading `meta.total`, cached with the list |
-| Header "Search tasks" | Searches the current project (`q` on the task list); on `/my-tasks` it searches my tasks |
+| Header "Search tasks" | Searches the current project (`q` on the task list); on `/dashboard/my-tasks` it searches my tasks |
 | Sidebar project count | API gives `memberCount`, not open-task count; the sidebar shows the role tag instead of a number |
 | Invitations "Resend" | No resend endpoint. Pending rows: **Revoke**. Expired rows: **Invite again** (creates a new invitation) |
 | Notification "is overdue" / "accepted your invitation" | Not produced by the API. Notifications show the five API types only (§9) |
@@ -191,7 +200,7 @@ UI checks only hide or disable controls; the API stays the authority. `myRole` c
 
 ## 9. Notifications
 
-- Header button with unread badge (`meta.unreadCount`); panel with the 10 newest, **Mark all read**, and "View all" → `/notifications` (filter Unread / All, pagination).
+- Header button with unread badge (`meta.unreadCount`); panel with the 10 newest, **Mark all read**, and "View all" → `/dashboard/notifications` (filter Unread / All, pagination).
 - Sentences from `type` + `payload` snapshot:
   - `TASK_ASSIGNED` — "{actor} assigned you “{task}” in {project}"
   - `TASK_COMPLETED` — "{actor} completed “{task}”"
@@ -199,7 +208,7 @@ UI checks only hide or disable controls; the API stays the authority. `myRole` c
   - `COMMENT_ADDED` — "{actor} commented on “{task}”: {preview}"
   - `PROJECT_INVITATION` — "{actor} invited you to {project} as {role}"
   A null actor name renders as "Someone".
-- Clicking marks it read and navigates: task types → `/projects/{projectId}/tasks?task={taskId}`; invitation → `/invitations`.
+- Clicking marks it read and navigates: task types → `/dashboard/projects/{projectId}/tasks?task={taskId}`; invitation → `/dashboard/invitations`.
 - **Live:** one SSE connection per signed-in tab (`fetch-event-source`, bearer token). On `notification`: prepend to the cache, bump the badge, show a toast, and invalidate the related project's task queries so other people's changes appear. Reconnect with backoff using a fresh token; after reconnecting, refetch the list to catch anything missed.
 
 ---
@@ -220,24 +229,27 @@ taskmaster-web/
 ├── design/prototype/            # the Claude Design export (reference only)
 ├── src/
 │   ├── app/
+│   │   ├── (marketing)/layout.tsx, page.tsx   # top bar + footer; `/` landing
+│   │   ├── (auth)/layout.tsx                   # split screen
 │   │   ├── (auth)/login, register
-│   │   ├── (app)/layout.tsx     # shell; guarded
-│   │   ├── (app)/my-tasks, projects, projects/[projectId]/{tasks,discussion,files,members,settings}
-│   │   ├── (app)/invitations, notifications, profile
+│   │   ├── dashboard/layout.tsx                # app shell; guarded
+│   │   ├── dashboard/page.tsx                  # → /dashboard/my-tasks
+│   │   ├── dashboard/my-tasks, projects, projects/[projectId]/{tasks,discussion,files,members,settings}
+│   │   ├── dashboard/invitations, notifications, profile
 │   │   ├── api/auth/[action]/route.ts
-│   │   ├── dev/ui/              # component showcase (dev only)
+│   │   ├── dev/ui/                             # component showcase (dev only)
 │   │   ├── layout.tsx, not-found.tsx, globals.css
 │   ├── components/ui/           # §6 inventory
 │   ├── components/shell/        # header, sidebar, drawer, theme switch
 │   ├── features/                # auth, projects, tasks, comments, attachments, members, invitations, notifications, profile, ai
 │   │   └── <feature>/{api.ts, components/, schemas.ts, utils.ts}
 │   ├── lib/api/                 # schema.d.ts, client.ts, errors.ts, upload.ts, download.ts
-│   ├── lib/auth/                # session provider, refresh lock, cookie helpers
+│   ├── lib/auth/                # hasSession, session provider, refresh lock, cookie helpers
 │   ├── lib/query/               # provider, keys
 │   ├── lib/format/              # dates, initials, notification text
-│   └── styles/                  # modernist.css, taskmaster-tokens.css
+│   ├── styles/                  # modernist.css, taskmaster-tokens.css
+│   └── proxy.ts                 # route guard (§3)
 ├── tests/ (unit, e2e)
-├── middleware.ts (or proxy.ts)
 ├── .env.example                 # NEXT_PUBLIC_API_URL, API_URL (server-side), API_SPEC_URL
 └── .github/workflows/ci.yml
 ```
@@ -250,19 +262,19 @@ taskmaster-web/
 
 Each step ends with lint, typecheck, format check, tests and `next build` passing, and is reviewed before committing. Run the API locally (`npm run dev` in the backend, port 3000); the web app runs on **3001**.
 
-1. **Scaffold & design tokens** — Next.js app (TS strict, App Router, `src/`), ESLint + Prettier (4 spaces, same config style as the backend), Tailwind v4, Modernist + TaskMaster token CSS, `tailwind.config.js` ported to v4 `@theme`, Archivo, next-themes with `data-theme`, Vitest, CI, `.env.example`, README stub. *Done when* a placeholder page renders in both themes and CI is green.
+1. **Scaffold & design tokens** — Next.js app (TS strict, App Router, `src/`), ESLint + Prettier (4 spaces, same config style as the backend), Tailwind v4, Modernist + TaskMaster token CSS, `tailwind.config.js` ported to v4 `@theme`, Archivo, next-themes with `data-theme`, Vitest, CI, `.env.example`, README stub. Route groups and layouts for the three areas — `(marketing)` with a coming-soon `/`, `(auth)` with placeholder login/register, `dashboard` with a placeholder shell — and `/dev/ui`. *Done when* the pages render in both themes and CI is green.
 2. **UI kit** — §6 components + `/dev/ui` showcase + component tests for Dialog, Segmented, Button loading/disabled.
 3. **API layer** — generated types, openapi-fetch client, `ApiError`, Query provider, key factory, error-mapping helpers; MSW test setup.
-4. **Auth** — route handlers + cookie, session provider, single-flight + Web Locks refresh, route guard, login/register screens, logout. Tests for refresh behaviour.
+4. **Auth** — route handlers + cookie, session provider, single-flight + Web Locks refresh, route guard (`/dashboard/**` protection, signed-in redirects away from `/login` / `/register`, safe `next`), login/register screens, logout. Tests for refresh behaviour.
 5. **App shell & projects** — header, sidebar, mobile drawer, theme switch, projects list page, New project dialog, project header + tabs, not-found screen.
 6. **Task list** — filter bar (status segmented with counts, priority, assignee, created by, due range, overdue, sort/order, search) in the URL, table / rows, pagination, skeletons, empty state.
 7. **Task panel & New task** — `?task=` sheet, permission-aware editing, optimistic PATCH with 409 handling, delete, New task dialog with AI description.
 8. **Board** — status columns, dnd-kit drag (keyboard too), optimistic move, per-column Add task, "100+ tasks — use the list" guard (API limit).
 9. **Comments & attachments** — thread + composer (edit / delete), upload with progress, list, download, delete; reused in Discussion and Files tabs.
-10. **Members & invitations** — members table, roles, transfer ownership, remove, leave; invite form and project invitations table (revoke / invite again); `/invitations` inbox with accept / decline.
+10. **Members & invitations** — members table, roles, transfer ownership, remove, leave; invite form and project invitations table (revoke / invite again); `/dashboard/invitations` inbox with accept / decline.
 11. **My tasks** — cross-project list reusing step 6 components. *(Good one to write by hand.)*
 12. **Notifications** — panel, page, sentence builder, mark read / all, SSE live updates and toasts.
 13. **Profile & project settings** — profile form (name, bio, avatar URL), change password → sign out, project details, delete (type-to-confirm), leave.
 14. **E2E, accessibility & delivery** — Playwright flows, keyboard and screen-reader pass, 375 px pass, README, Dockerfile. Optional: deploy to the home lab behind cloudflared.
 
-**Cut line if time runs short:** step 8's keyboard drag, upload progress bars, then step 14's Docker/deploy. Never cut auth correctness (step 4) or error handling.
+**Cut line if time runs short:** step 8's keyboard drag, upload progress bars, then step 14's Docker/deploy. Optional: replace the coming-soon landing page with a real marketing page. Never cut auth correctness (step 4) or error handling.

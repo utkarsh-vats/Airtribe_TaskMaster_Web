@@ -45,6 +45,21 @@
     a:hover {
         color: var(--color-accent-600);
     }
+
+    /* Modernist's `.nav a` (inherit colour, accent on hover) outranks the `.btn-*` colours;
+       restore them for links styled as buttons in a header. */
+    .nav a.btn,
+    .nav a.btn:hover {
+        color: var(--color-text);
+    }
+    .nav a.btn-primary,
+    .nav a.btn-primary:hover {
+        color: var(--color-bg);
+    }
+    .nav a.btn-ghost,
+    .nav a.btn-ghost:hover {
+        color: var(--color-accent);
+    }
 }
 
 /* Dark mode follows next-themes' data-theme attribute on <html>. */
