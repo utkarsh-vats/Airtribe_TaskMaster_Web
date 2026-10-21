@@ -1,17 +1,14 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+
+import { LoginForm } from '@/features/auth/components/LoginForm';
 
 export const metadata: Metadata = { title: 'Sign in' };
 
-// Placeholder — the real form comes in step 4.
-export default function LoginPage() {
-    return (
-        <>
-            <h2 className="m-0">Welcome back</h2>
-            <p className="text-muted m-0">Sign-in form coming soon.</p>
-            <p className="m-0 text-sm">
-                New here? <Link href="/register">Create an account</Link>
-            </p>
-        </>
-    );
+/** First value of a search param that may repeat. */
+const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+
+export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
+    // Raw `next`: carried through the switch as-is; LoginForm only ever navigates to safeNext(next).
+    const next = first((await searchParams).next);
+    return <LoginForm next={next} />;
 }
