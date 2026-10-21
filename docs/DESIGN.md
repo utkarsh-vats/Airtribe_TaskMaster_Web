@@ -264,17 +264,74 @@ Each step ends with lint, typecheck, format check, tests and `next build` passin
 
 1. **Scaffold & design tokens** — Next.js app (TS strict, App Router, `src/`), ESLint + Prettier (4 spaces, same config style as the backend), Tailwind v4, Modernist + TaskMaster token CSS, `tailwind.config.js` ported to v4 `@theme`, Archivo, next-themes with `data-theme`, Vitest, CI, `.env.example`, README stub. Route groups and layouts for the three areas — `(marketing)` with a coming-soon `/`, `(auth)` with placeholder login/register, `dashboard` with a placeholder shell — and `/dev/ui`. *Done when* the pages render in both themes and CI is green.
 2. **UI kit** — §6 components + `/dev/ui` showcase + component tests for Dialog, Segmented, Button loading/disabled.
-3. **API layer** — generated types, openapi-fetch client, `ApiError`, Query provider, key factory, error-mapping helpers; MSW test setup.
-4. **Auth** — route handlers + cookie, session provider, single-flight + Web Locks refresh, route guard (`/dashboard/**` protection, signed-in redirects away from `/login` / `/register`, safe `next`), login/register screens, logout. Tests for refresh behaviour.
-5. **App shell & projects** — header, sidebar, mobile drawer, theme switch, projects list page, New project dialog, project header + tabs, not-found screen.
-6. **Task list** — filter bar (status segmented with counts, priority, assignee, created by, due range, overdue, sort/order, search) in the URL, table / rows, pagination, skeletons, empty state.
-7. **Task panel & New task** — `?task=` sheet, permission-aware editing, optimistic PATCH with 409 handling, delete, New task dialog with AI description.
-8. **Board** — status columns, dnd-kit drag (keyboard too), optimistic move, per-column Add task, "100+ tasks — use the list" guard (API limit).
-9. **Comments & attachments** — thread + composer (edit / delete), upload with progress, list, download, delete; reused in Discussion and Files tabs.
-10. **Members & invitations** — members table, roles, transfer ownership, remove, leave; invite form and project invitations table (revoke / invite again); `/dashboard/invitations` inbox with accept / decline.
-11. **My tasks** — cross-project list reusing step 6 components. *(Good one to write by hand.)*
-12. **Notifications** — panel, page, sentence builder, mark read / all, SSE live updates and toasts.
-13. **Profile & project settings** — profile form (name, bio, avatar URL), change password → sign out, project details, delete (type-to-confirm), leave.
-14. **E2E, accessibility & delivery** — Playwright flows, keyboard and screen-reader pass, 375 px pass, README, Dockerfile. Optional: deploy to the home lab behind cloudflared.
+Steps 3–14 are split into small, separately reviewed sub-steps:
 
-**Cut line if time runs short:** step 8's keyboard drag, upload progress bars, then step 14's Docker/deploy. Optional: replace the coming-soon landing page with a real marketing page. Never cut auth correctness (step 4) or error handling.
+**3 · API layer**
+- **3a** Generated API types — `openapi-typescript` from `/openapi.json` → `src/lib/api/schema.d.ts`; friendly aliases in `src/lib/api/types.ts`.
+- **3b** API client + `ApiError` — openapi-fetch client, bearer middleware hook, error-envelope parsing; MSW test setup.
+- **3c** Query provider, key factory, error helpers — TanStack Query provider, §7 key factory, §7 error-mapping helpers.
+
+**4 · Auth**
+- **4a** Auth route handlers + cookie — `app/api/auth/*`, `tm_refresh` httpOnly cookie.
+- **4b** Session provider + single-flight / cross-tab refresh + retry — in-memory access token, Web Locks, `TOKEN_EXPIRED` retry. Tests for refresh behaviour.
+- **4c** Route guard (`proxy.ts`) + safe `next` — `/dashboard/**` protection, signed-in redirects away from `/login` / `/register`.
+- **4d** Login / register forms.
+- **4e** Logout / logout-all.
+
+**5 · App shell & projects**
+- **5a** Dashboard header.
+- **5b** Sidebar + mobile drawer.
+- **5c** Projects page + New project dialog.
+- **5d** Project layout, tabs, not-found.
+
+**6 · Task list**
+- **6a** Task list — table / rows, pagination, skeleton, empty state.
+- **6b** URL state, status segmented with counts, search.
+- **6c** Advanced filters + sort — priority, assignee, created by, due range, overdue, sort / order.
+
+**7 · Task panel & New task**
+- **7a** Task panel read-only — `?task=` sheet.
+- **7b** Panel editing — permissions, optimistic PATCH, 409 handling.
+- **7c** Delete task.
+- **7d** New task dialog.
+- **7e** AI description.
+
+**8 · Board**
+- **8a** Board read-only + view switch — status columns, "100+ tasks — use the list" guard (API limit).
+- **8b** Drag & drop + optimistic move — dnd-kit, keyboard too.
+- **8c** Per-column Add task.
+
+**9 · Comments & attachments**
+- **9a** Comments list / post.
+- **9b** Comments edit / delete.
+- **9c** Attachments list / download.
+- **9d** Upload, progress, delete, 413 / 415 handling.
+- **9e** Discussion & Files tabs (reuse 9a–9d).
+
+**10 · Members & invitations**
+- **10a** Members table.
+- **10b** Roles, transfer ownership, remove, leave.
+- **10c** Invite form + project invitations table (revoke / invite again).
+- **10d** `/dashboard/invitations` inbox (accept / decline) + badge.
+
+**11 · My tasks** — cross-project list reusing step 6 components. *(Hand-written.)*
+
+**12 · Notifications**
+- **12a** Notification sentences + `/dashboard/notifications` page.
+- **12b** Header panel + mark read / mark all read.
+- **12c** SSE live updates + toasts + query invalidation.
+
+**13 · Profile & project settings**
+- **13a** Profile form (name, bio, avatar URL).
+- **13b** Change password → sign out.
+- **13c** Project settings (details).
+- **13d** Danger zone — delete (type-to-confirm), leave.
+
+**14 · E2E, accessibility & delivery**
+- **14a** Playwright + auth E2E.
+- **14b** Task-flow E2E.
+- **14c** Accessibility (keyboard, screen reader) and 375 px pass.
+- **14d** README + Dockerfile.
+- **14e** Optional: home-lab deploy behind cloudflared.
+
+**Cut line if time runs short:** keyboard drag (8b), upload progress bars (9d), then Docker / deploy (14d's Dockerfile, 14e). Optional: replace the coming-soon landing page with a real marketing page. Never cut auth correctness (4a–4e) or error handling.

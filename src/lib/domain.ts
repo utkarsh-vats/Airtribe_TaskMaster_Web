@@ -1,24 +1,26 @@
-// Domain enums as string-literal unions. Replaced by the generated API types in step 3.
+// Domain enums come from the API (src/lib/api/types.ts); this file adds display order and labels.
 
-export type TaskStatus = 'OPEN' | 'IN_PROGRESS' | 'COMPLETED';
-export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-export type ProjectRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+import type { ProjectRole, TaskPriority, TaskStatus } from './api/types';
 
-export const TASK_STATUSES = [
-    'OPEN',
-    'IN_PROGRESS',
-    'COMPLETED',
-] as const satisfies readonly TaskStatus[];
+export type { ProjectRole, TaskPriority, TaskStatus };
+
+/**
+ * A readonly list that must name every member of `U` — a type error when the API adds an enum
+ * value the UI doesn't order yet. Usage: `allOf<TaskStatus>()(['OPEN', …])`.
+ */
+const allOf =
+    <U extends string>() =>
+    <const L extends readonly U[]>(
+        list: L & ([Exclude<U, L[number]>] extends [never] ? unknown : never),
+    ): L =>
+        list;
+
+export const TASK_STATUSES = allOf<TaskStatus>()(['OPEN', 'IN_PROGRESS', 'COMPLETED']);
 
 /** Display order: most urgent first (DESIGN.md §5). */
-export const TASK_PRIORITIES = [
-    'URGENT',
-    'HIGH',
-    'MEDIUM',
-    'LOW',
-] as const satisfies readonly TaskPriority[];
+export const TASK_PRIORITIES = allOf<TaskPriority>()(['URGENT', 'HIGH', 'MEDIUM', 'LOW']);
 
-export const PROJECT_ROLES = ['OWNER', 'ADMIN', 'MEMBER'] as const satisfies readonly ProjectRole[];
+export const PROJECT_ROLES = allOf<ProjectRole>()(['OWNER', 'ADMIN', 'MEMBER']);
 
 export const STATUS_LABELS: Record<TaskStatus, string> = {
     OPEN: 'To do',

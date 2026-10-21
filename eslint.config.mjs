@@ -11,6 +11,7 @@ export default defineConfig([
         'build/**',
         'coverage/**',
         'next-env.d.ts',
+        'src/lib/api/schema.d.ts',
         'design/prototype/**',
         'local_docs/**',
     ]),

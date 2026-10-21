@@ -6,6 +6,7 @@ src/styles/modernist.css
 src/styles/taskmaster-tokens.css
 
 # Generated / installed
+src/lib/api/schema.d.ts
 .next/
 out/
 build/
