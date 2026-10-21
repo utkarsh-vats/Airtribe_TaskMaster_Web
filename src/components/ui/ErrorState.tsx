@@ -12,6 +12,8 @@ type ErrorStateProps = {
     /** Shows a "Try again" button. */
     onRetry?: () => void;
     retrying?: boolean;
+    /** Inline variant for tight spaces (sidebar): no rules, small type, small button. */
+    compact?: boolean;
     className?: string;
 };
 
@@ -21,8 +23,27 @@ export function ErrorState({
     message,
     onRetry,
     retrying = false,
+    compact = false,
     className,
 }: ErrorStateProps) {
+    if (compact) {
+        return (
+            <div
+                role="alert"
+                className={clsx('flex flex-col items-start gap-1 py-2 text-sm', className)}
+            >
+                <span className="font-semibold text-danger">{title}</span>
+                <span className="text-muted">{message}</span>
+                {onRetry && (
+                    <Button variant="ghost" size="sm" onClick={onRetry} loading={retrying}>
+                        {!retrying && <RotateCw aria-hidden size={12} />}
+                        Try again
+                    </Button>
+                )}
+            </div>
+        );
+    }
+
     return (
         <div
             role="alert"

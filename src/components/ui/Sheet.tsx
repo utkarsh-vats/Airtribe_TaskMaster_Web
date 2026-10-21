@@ -3,7 +3,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { clsx } from 'clsx';
 import { X } from 'lucide-react';
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactElement, ReactNode, RefObject } from 'react';
 
 import { Button } from './Button';
 
@@ -20,6 +20,11 @@ type SidePanelProps = {
     children?: ReactNode;
     /** Sticky-free footer row under the body (2px rule above). */
     footer?: ReactNode;
+    /**
+     * Where focus goes on close when the panel is opened without `trigger` (controlled):
+     * Radix only restores focus to its own Trigger.
+     */
+    returnFocusTo?: RefObject<HTMLElement | null>;
     className?: string;
 };
 
@@ -33,6 +38,7 @@ function SidePanel({
     headerActions,
     children,
     footer,
+    returnFocusTo,
     className,
 }: SidePanelProps & { side: 'left' | 'right' }) {
     return (
@@ -43,6 +49,11 @@ function SidePanel({
                 <DialogPrimitive.Content
                     data-side={side}
                     className={clsx('tm-sheet', className)}
+                    onCloseAutoFocus={(event) => {
+                        if (!returnFocusTo?.current) return;
+                        event.preventDefault();
+                        returnFocusTo.current.focus();
+                    }}
                     {...(description ? {} : { 'aria-describedby': undefined })}
                 >
                     <div className="tm-sheet-header">

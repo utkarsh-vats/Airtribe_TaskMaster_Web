@@ -426,3 +426,52 @@ a.seg-opt:not([aria-current='page']):hover {
 a.seg-opt:focus-visible {
     outline-offset: -2px;
 }
+
+/* — small tag — */
+.tag-sm {
+    font-size: 10px;
+    padding: 1px 6px;
+}
+
+/* — dashboard shell — */
+:root {
+    /* The header's fixed height (.nav padding + 36px controls + 2px rule); the sidebar sticks under it. */
+    --tm-header-h: 62px;
+}
+.tm-nav-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-width: 0;
+    padding: 8px 10px;
+    font-size: 14px;
+    color: var(--color-text);
+    text-decoration: none;
+}
+.tm-nav-link:hover {
+    color: var(--color-text);
+    background: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+.tm-nav-link[aria-current='page'],
+.tm-nav-link[aria-current='page']:hover {
+    background: var(--color-accent-100);
+    color: var(--color-accent-900);
+    font-weight: 800;
+}
+.tm-nav-link:focus-visible {
+    outline-offset: -2px;
+}
+.tm-count-badge {
+    display: inline-grid;
+    place-items: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    margin-left: auto;
+    background: var(--color-accent);
+    color: var(--color-bg);
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+}

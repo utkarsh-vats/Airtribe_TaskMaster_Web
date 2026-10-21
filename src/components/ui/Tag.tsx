@@ -12,10 +12,19 @@ import {
 
 export type TagTone = 'neutral' | 'accent' | 'outline';
 
-type TagProps = ComponentProps<'span'> & { tone?: TagTone };
+type TagProps = ComponentProps<'span'> & {
+    tone?: TagTone;
+    /** 'sm' for dense lists (sidebar rows). */
+    size?: 'default' | 'sm';
+};
 
-export function Tag({ tone = 'neutral', className, ...props }: TagProps) {
-    return <span className={clsx('tag', `tag-${tone}`, className)} {...props} />;
+export function Tag({ tone = 'neutral', size = 'default', className, ...props }: TagProps) {
+    return (
+        <span
+            className={clsx('tag', `tag-${tone}`, size === 'sm' && 'tag-sm', className)}
+            {...props}
+        />
+    );
 }
 
 const STATUS_TONES: Record<TaskStatus, TagTone> = {
@@ -61,9 +70,17 @@ export function PriorityMark({
     );
 }
 
-export function RoleTag({ role, className }: { role: ProjectRole; className?: string }) {
+export function RoleTag({
+    role,
+    size,
+    className,
+}: {
+    role: ProjectRole;
+    size?: 'default' | 'sm';
+    className?: string;
+}) {
     return (
-        <Tag tone={role === 'OWNER' ? 'accent' : 'neutral'} className={className}>
+        <Tag tone={role === 'OWNER' ? 'accent' : 'neutral'} size={size} className={className}>
             {ROLE_LABELS[role]}
         </Tag>
     );

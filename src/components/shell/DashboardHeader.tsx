@@ -1,7 +1,7 @@
 'use client';
 
 import { Bell, Menu as MenuIcon } from 'lucide-react';
-import { Suspense } from 'react';
+import { Suspense, type Ref } from 'react';
 
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { useUnreadCount } from '@/features/notifications/api';
@@ -19,13 +19,21 @@ export const formatBadge = (count: number) => (count > 99 ? '99+' : String(count
  * search (820px and up), theme switch, notifications with unread badge, profile menu.
  * Sticky, full width, 2px rule underneath.
  */
-export function DashboardHeader({ onOpenNav }: { onOpenNav?: () => void }) {
+export function DashboardHeader({
+    onOpenNav,
+    menuButtonRef,
+}: {
+    onOpenNav?: () => void;
+    /** The "Open navigation" button, so the drawer can return focus to it. */
+    menuButtonRef?: Ref<HTMLButtonElement>;
+}) {
     return (
-        <header className="nav sticky top-0 z-30 gap-3 bg-bg">
+        <header className="nav sticky top-0 z-30 h-[var(--tm-header-h)] gap-3 bg-bg">
             <Button
                 variant="secondary"
                 iconOnly
                 aria-label="Open navigation"
+                ref={menuButtonRef}
                 className="md:hidden"
                 onClick={onOpenNav}
             >
