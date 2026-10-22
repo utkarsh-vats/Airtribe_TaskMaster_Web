@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+    countBarFilters,
+    effectiveOrder,
     filtersToSearch,
     hasActiveFilters,
+    hasAnyListParams,
     parseTaskFilters,
     toQueryParams,
     updateFilters,
@@ -111,5 +114,126 @@ describe('hasActiveFilters', () => {
         expect(hasActiveFilters({ page: 3 })).toBe(false);
         expect(hasActiveFilters({ page: 1, q: 'a' })).toBe(true);
         expect(hasActiveFilters({ page: 1, status: ['OPEN'] })).toBe(true);
+    });
+});
+
+describe('advanced filters (6c)', () => {
+    const MARA = '6c1d1b8e-2f4a-4c3b-8d9e-0a1b2c3d4e5f';
+
+    it('priority: comma lists in Urgent → Low order, junk dropped', () => {
+        expect(parse('priority=LOW,URGENT,HIGH,LOW').priority).toEqual(['URGENT', 'HIGH', 'LOW']);
+        expect(parse('priority=CRITICAL')).toEqual({ page: 1 });
+    });
+
+    it('assignee: me, unassigned or a uuid', () => {
+        expect(parse('assignee=me').assignee).toBe('me');
+        expect(parse('assignee=unassigned').assignee).toBe('unassigned');
+        expect(parse(`assignee=${MARA}`).assignee).toBe(MARA);
+        expect(parse('assignee=mara')).toEqual({ page: 1 });
+    });
+
+    it('createdBy: me or a uuid — never unassigned', () => {
+        expect(parse('createdBy=me').createdBy).toBe('me');
+        expect(parse(`createdBy=${MARA}`).createdBy).toBe(MARA);
+        expect(parse('createdBy=unassigned')).toEqual({ page: 1 });
+    });
+
+    it('dueFrom / dueTo: real YYYY-MM-DD days only; an inverted range is dropped', () => {
+        expect(parse('dueFrom=2026-10-28&dueTo=2026-10-30')).toMatchObject({
+            dueFrom: '2026-10-28',
+            dueTo: '2026-10-30',
+        });
+        expect(parse('dueFrom=2026-10-28&dueTo=2026-10-28').dueTo).toBe('2026-10-28');
+        expect(parse('dueFrom=2026-02-31')).toEqual({ page: 1 });
+        expect(parse('dueTo=28-10-2026')).toEqual({ page: 1 });
+        expect(parse('dueTo=2026-10-28T00:00')).toEqual({ page: 1 });
+        expect(parse('dueFrom=2026-11-02&dueTo=2026-10-01')).toEqual({ page: 1 });
+    });
+
+    it('overdue: only "true" counts', () => {
+        expect(parse('overdue=true').overdue).toBe(true);
+        expect(parse('overdue=false')).toEqual({ page: 1 });
+        expect(parse('overdue=1')).toEqual({ page: 1 });
+    });
+
+    it('sort and order: known values only', () => {
+        expect(parse('sort=dueDate&order=asc')).toMatchObject({ sort: 'dueDate', order: 'asc' });
+        expect(parse('sort=assignee&order=up')).toEqual({ page: 1 });
+    });
+
+    it('writes every param in the fixed order', () => {
+        const filters = parse(
+            `order=desc&sort=title&overdue=true&dueTo=2026-10-30&dueFrom=2026-10-01&createdBy=me&assignee=unassigned&priority=LOW,HIGH&q=x&status=OPEN&page=2`,
+        );
+        expect(filtersToSearch(filters, new URLSearchParams('task=t1'))).toBe(
+            'status=OPEN&q=x&priority=HIGH%2CLOW&assignee=unassigned&createdBy=me&dueFrom=2026-10-01&dueTo=2026-10-30&overdue=true&sort=title&order=desc&page=2&task=t1',
+        );
+    });
+
+    it('maps to the API query; sort and order pass through', () => {
+        expect(
+            toQueryParams(
+                parse(
+                    `priority=URGENT&assignee=me&createdBy=${MARA}&overdue=true&sort=priority&order=asc`,
+                ),
+            ),
+        ).toEqual({
+            priority: ['URGENT'],
+            assignee: 'me',
+            createdBy: MARA,
+            overdue: 'true',
+            sort: 'priority',
+            order: 'asc',
+        });
+    });
+});
+
+describe('due range → API instants (user time zone)', () => {
+    const originalTz = process.env.TZ;
+    afterEach(() => {
+        process.env.TZ = originalTz;
+    });
+
+    it('Asia/Kolkata: dueAfter = start of from − 1 ms, dueBefore = start of the day after to', () => {
+        process.env.TZ = 'Asia/Kolkata';
+        expect(toQueryParams(parse('dueFrom=2026-10-28&dueTo=2026-10-30'))).toEqual({
+            dueAfter: '2026-10-27T18:29:59.999Z',
+            dueBefore: '2026-10-30T18:30:00.000Z',
+        });
+    });
+
+    it('America/New_York across the end of DST (Nov 1 2026)', () => {
+        process.env.TZ = 'America/New_York';
+        expect(toQueryParams(parse('dueFrom=2026-11-01&dueTo=2026-11-01'))).toEqual({
+            dueAfter: '2026-11-01T03:59:59.999Z', // midnight EDT (UTC−4)
+            dueBefore: '2026-11-02T05:00:00.000Z', // midnight EST (UTC−5)
+        });
+    });
+});
+
+describe('sort helpers', () => {
+    it('effective order uses each field default when order is absent', () => {
+        expect(effectiveOrder({})).toBe('desc'); // createdAt
+        expect(effectiveOrder({ sort: 'dueDate' })).toBe('asc');
+        expect(effectiveOrder({ sort: 'updatedAt' })).toBe('desc');
+        expect(effectiveOrder({ sort: 'priority' })).toBe('desc');
+        expect(effectiveOrder({ sort: 'title' })).toBe('asc');
+        expect(effectiveOrder({ sort: 'title', order: 'desc' })).toBe('desc');
+    });
+
+    it('counts the filter-bar filters (not status, search or sort)', () => {
+        expect(countBarFilters(parse('status=OPEN&q=x&sort=title'))).toBe(0);
+        expect(
+            countBarFilters(
+                parse(
+                    'priority=HIGH&assignee=me&createdBy=me&dueFrom=2026-10-01&dueTo=2026-10-02&overdue=true',
+                ),
+            ),
+        ).toBe(5);
+    });
+
+    it('Clear filters has something to do with a sort alone', () => {
+        expect(hasAnyListParams(parse('order=asc'))).toBe(true);
+        expect(hasAnyListParams(parse('page=4'))).toBe(false);
     });
 });

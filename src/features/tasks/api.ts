@@ -40,7 +40,12 @@ export type StatusCounts = Record<'ALL' | TaskStatus, number | undefined>;
  * except status, reading meta.total (DESIGN.md §5). Undefined while loading.
  */
 export function useTaskStatusCounts(projectId: string, filters: TaskFilters): StatusCounts {
-    const base = toQueryParams({ ...filters, status: undefined });
+    // Every filter but status; sort/order don't change a count, so they don't split the cache.
+    const {
+        sort: _sort,
+        order: _order,
+        ...base
+    } = toQueryParams({ ...filters, status: undefined });
     const variants: ('ALL' | TaskStatus)[] = ['ALL', ...TASK_STATUSES];
     const results = useQueries({
         queries: variants.map((variant) => {

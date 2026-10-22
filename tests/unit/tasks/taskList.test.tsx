@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { bindPermissions } from '@/features/projects/permissions';
 import { ProjectContext } from '@/features/projects/ProjectContext';
@@ -15,6 +15,7 @@ import { TaskListView } from '@/features/tasks/components/TaskListView';
 import type { ProjectDetail, TaskListItem, User } from '@/lib/api/types';
 import { resetRefreshForTests, startSession } from '@/lib/auth/refresh';
 import { sessionStore } from '@/lib/auth/store';
+import { shallowUrl } from '@/lib/hooks/shallowUrl';
 
 import { API_ORIGIN, server } from '../../msw/server';
 
@@ -98,6 +99,8 @@ function mockTasks(
 ) {
     const requests: string[] = [];
     server.use(
+        // The filter bar's assignee / creator options.
+        http.get(`${API_ORIGIN}/api/v1/projects/p1/members`, () => HttpResponse.json({ data: [] })),
         http.get(tasksUrl, ({ request }) => {
             const url = new URL(request.url);
             requests.push(url.search);
@@ -140,7 +143,13 @@ const listRequests = (requests: string[]) => requests.filter((r) => r.includes('
 const table = () => screen.getByTestId('task-table');
 const rows = () => screen.getByTestId('task-rows');
 
+/** Client-side URL updates (filters, page, open task) go through shallowUrl, not the router. */
+let urlPush: MockInstance<(url: string) => void>;
+let urlReplace: MockInstance<(url: string) => void>;
+
 beforeEach(() => {
+    urlPush = vi.spyOn(shallowUrl, 'push').mockImplementation(() => {});
+    urlReplace = vi.spyOn(shallowUrl, 'replace').mockImplementation(() => {});
     sessionStore.reset();
     resetRefreshForTests();
     startSession({ accessToken: 'at', expiresIn: 900, user });
@@ -209,12 +218,12 @@ describe('table (820px and up)', () => {
         await screen.findByText('26 tasks');
 
         await u.click(within(table()).getByRole('row', { name: 'Task t4' }));
-        expect(nav.push).toHaveBeenLastCalledWith(`${PATH}?page=2&task=t4`, { scroll: false });
+        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?page=2&task=t4`);
 
-        nav.push.mockClear();
+        urlPush.mockClear();
         within(table()).getByRole('row', { name: 'Task t4' }).focus();
         await u.keyboard('{Enter}');
-        expect(nav.push).toHaveBeenLastCalledWith(`${PATH}?page=2&task=t4`, { scroll: false });
+        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?page=2&task=t4`);
     });
 });
 
@@ -247,6 +256,20 @@ describe('rows (below 820px)', () => {
     });
 });
 
+describe('mobile row click', () => {
+    it('a plain click opens the task in place; the href stays for new tabs', async () => {
+        mockTasks([TASKS]);
+        const u = renderList('page=1');
+        await screen.findByText('3 tasks');
+
+        const link = within(rows()).getByRole('link', { name: /Set up 301 redirects/ });
+        await u.click(link);
+
+        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?page=1&task=t2`);
+        expect(link).toHaveAttribute('href', `${PATH}?page=1&task=t2`);
+    });
+});
+
 describe('task panel vs New task dialog', () => {
     it('New task closes an open task; opening a task drops ?new', async () => {
         mockTasks([TASKS]);
@@ -254,10 +277,10 @@ describe('task panel vs New task dialog', () => {
         await screen.findByText('3 tasks');
 
         await u.click(screen.getByRole('button', { name: 'New task' }));
-        expect(nav.push).toHaveBeenLastCalledWith(`${PATH}?new=1`, { scroll: false });
+        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?new=1`);
 
         await u.click(within(table()).getByRole('row', { name: 'Set up 301 redirects' }));
-        expect(nav.push).toHaveBeenLastCalledWith(`${PATH}?task=t2`, { scroll: false });
+        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?task=t2`);
         expect(within(rows()).getByRole('link', { name: /Cookie consent banner/ })).toHaveAttribute(
             'href',
             `${PATH}?task=t3`,
@@ -273,7 +296,7 @@ describe('toolbar and pagination', () => {
 
         await u.click(screen.getByRole('button', { name: 'New task' }));
 
-        expect(nav.push).toHaveBeenCalledWith(`${PATH}?page=2&new=1`, { scroll: false });
+        expect(urlPush).toHaveBeenCalledWith(`${PATH}?page=2&new=1`);
     });
 
     it('requests the page from ?page and drops page=1 from the URL', async () => {
@@ -284,10 +307,10 @@ describe('toolbar and pagination', () => {
         expect(listRequests(requests)).toEqual(['?page=2&limit=25']);
 
         await u.click(screen.getByRole('button', { name: /Next/ }));
-        expect(nav.push).toHaveBeenLastCalledWith(`${PATH}?page=3`, { scroll: false });
+        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?page=3`);
 
         await u.click(screen.getByRole('button', { name: /Previous/ }));
-        expect(nav.push).toHaveBeenLastCalledWith(PATH, { scroll: false });
+        expect(urlPush).toHaveBeenLastCalledWith(PATH);
     });
 });
 
@@ -310,7 +333,7 @@ describe('states', () => {
         const buttons = screen.getAllByRole('button', { name: 'New task' });
         expect(buttons).toHaveLength(2);
         await u.click(buttons[1] as HTMLElement);
-        expect(nav.push).toHaveBeenCalledWith(`${PATH}?new=1`, { scroll: false });
+        expect(urlPush).toHaveBeenCalledWith(`${PATH}?new=1`);
     });
 
     it('shows "Nothing on this page" past the end, with a link to page 1', async () => {
@@ -394,7 +417,7 @@ describe('status segmented control', () => {
         await screen.findByText('3 tasks');
 
         await u.click(segment(/To do/));
-        expect(nav.push).toHaveBeenLastCalledWith(`${PATH}?status=OPEN&task=t1`, { scroll: false });
+        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?status=OPEN&task=t1`);
     });
 
     it('All removes the status', async () => {
@@ -404,7 +427,7 @@ describe('status segmented control', () => {
         expect(segment(/Done/)).toBeChecked();
 
         await u.click(segment(/All/));
-        expect(nav.push).toHaveBeenLastCalledWith(`${PATH}?q=x`, { scroll: false });
+        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?q=x`);
     });
 
     it('highlights nothing when the URL combines several statuses', async () => {
@@ -438,15 +461,13 @@ describe('mobile search', () => {
 
         await u.clear(search());
         await u.type(search(), 'redirects');
-        expect(nav.replace).not.toHaveBeenCalled(); // still within the 300 ms pause
+        expect(urlReplace).not.toHaveBeenCalled(); // still within the 300 ms pause
 
         await vi.waitFor(() =>
-            expect(nav.replace).toHaveBeenCalledWith(`${PATH}?q=redirects&task=t1`, {
-                scroll: false,
-            }),
+            expect(urlReplace).toHaveBeenCalledWith(`${PATH}?q=redirects&task=t1`),
         );
-        expect(nav.replace).toHaveBeenCalledOnce();
-        expect(nav.push).not.toHaveBeenCalled();
+        expect(urlReplace).toHaveBeenCalledOnce();
+        expect(urlPush).not.toHaveBeenCalled();
     });
 
     it('Esc clears the search at once', async () => {
@@ -458,9 +479,7 @@ describe('mobile search', () => {
         await u.keyboard('{Escape}');
 
         expect(search()).toHaveValue('');
-        expect(nav.replace).toHaveBeenCalledExactlyOnceWith(`${PATH}?status=OPEN`, {
-            scroll: false,
-        });
+        expect(urlReplace).toHaveBeenCalledExactlyOnceWith(`${PATH}?status=OPEN`);
     });
 });
 
@@ -472,7 +491,10 @@ describe('filtered empty state', () => {
         expect(await screen.findByRole('heading', { name: 'No tasks match' })).toBeInTheDocument();
         expect(screen.getByText('Clear the search or pick another status.')).toBeInTheDocument();
 
-        await u.click(screen.getByRole('button', { name: 'Clear filters' }));
-        expect(nav.push).toHaveBeenLastCalledWith(PATH);
+        // The empty state's button (the filter bar has its own Clear filters too).
+        const empty = screen.getByRole('heading', { name: 'No tasks match' })
+            .parentElement as HTMLElement;
+        await u.click(within(empty).getByRole('button', { name: 'Clear filters' }));
+        expect(urlPush).toHaveBeenLastCalledWith(PATH);
     });
 });

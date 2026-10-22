@@ -3,7 +3,7 @@
 import { clsx } from 'clsx';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
 
 import { Avatar } from '@/components/ui/Avatar';
@@ -19,6 +19,7 @@ import { useProjectContext } from '@/features/projects/ProjectContext';
 import { errorMessage } from '@/lib/api/messages';
 import type { TaskListItem, TaskStatus } from '@/lib/api/types';
 import { STATUS_LABELS, TASK_STATUSES } from '@/lib/domain';
+import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { useUrlWith } from '@/lib/hooks/useUrlWith';
 
 import { useTasks, useTaskStatusCounts, type StatusCounts } from '../api';
@@ -30,6 +31,7 @@ import {
     type TaskFilters,
 } from '../filters';
 import { formatDue } from '../format';
+import { TaskFilterBar } from './TaskFilterBar';
 import { TaskSearch } from './TaskSearch';
 
 const firstLine = (text: string | null) => text?.split('\n').find((line) => line.trim()) ?? '';
@@ -46,7 +48,6 @@ type StatusOption = 'ALL' | TaskStatus;
  */
 export function TaskListView() {
     const { project } = useProjectContext();
-    const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const urlWith = useUrlWith();
@@ -59,8 +60,9 @@ export function TaskListView() {
         const search = filtersToSearch(next, searchParams);
         return search ? `${pathname}?${search}` : pathname;
     };
+    // Filters, page and the open task are client state in the URL: no server round trip.
     const applyFilters = (changes: Partial<TaskFilters>) =>
-        router.push(filterUrl(updateFilters(filters, changes)), { scroll: false });
+        shallowUrl.push(filterUrl(updateFilters(filters, changes)));
 
     // Typing replaces the history entry instead of adding one per pause.
     const searchKey = searchParams.toString();
@@ -69,19 +71,19 @@ export function TaskListView() {
             const current = new URLSearchParams(searchKey);
             const next = updateFilters(parseTaskFilters(current), { q: q || undefined });
             const search = filtersToSearch(next, current);
-            router.replace(search ? `${pathname}?${search}` : pathname, { scroll: false });
+            shallowUrl.replace(search ? `${pathname}?${search}` : pathname);
         },
-        [router, pathname, searchKey],
+        [pathname, searchKey],
     );
 
     // The task panel (?task) and the New task dialog (?new) never open together.
     const taskHref = (taskId: string) => urlWith({ task: taskId, new: null });
-    const openTask = (taskId: string) => router.push(taskHref(taskId), { scroll: false });
+    const openTask = (taskId: string) => shallowUrl.push(taskHref(taskId));
 
     const newTaskButton = (
         <Button
             variant="primary"
-            onClick={() => router.push(urlWith({ new: '1', task: null }), { scroll: false })}
+            onClick={() => shallowUrl.push(urlWith({ new: '1', task: null }))}
         >
             <Plus aria-hidden size={14} />
             New task
@@ -105,6 +107,12 @@ export function TaskListView() {
                 />
                 <span className="ml-auto">{newTaskButton}</span>
             </div>
+            <TaskFilterBar
+                projectId={project.id}
+                filters={filters}
+                onChange={applyFilters}
+                onClear={() => shallowUrl.push(pathname)}
+            />
             <span className="text-muted text-sm" aria-live="polite">
                 {tasks.data ? countLabel(tasks.data.meta.total) : ' '}
             </span>
@@ -145,7 +153,7 @@ export function TaskListView() {
                         title="No tasks match"
                         body="Clear the search or pick another status."
                         action={
-                            <Button variant="secondary" onClick={() => router.push(pathname)}>
+                            <Button variant="secondary" onClick={() => shallowUrl.push(pathname)}>
                                 Clear filters
                             </Button>
                         }
@@ -184,7 +192,7 @@ export function TaskListView() {
                     <TaskTable items={items} onOpen={openTask} />
                 </div>
                 <div className="md:hidden" data-testid="task-rows">
-                    <TaskRows items={items} href={taskHref} />
+                    <TaskRows items={items} href={taskHref} onOpen={openTask} />
                 </div>
             </div>
             <Pagination
@@ -292,7 +300,15 @@ function TaskTable({ items, onOpen }: { items: TaskListItem[]; onOpen: (taskId: 
     );
 }
 
-function TaskRows({ items, href }: { items: TaskListItem[]; href: (taskId: string) => string }) {
+function TaskRows({
+    items,
+    href,
+    onOpen,
+}: {
+    items: TaskListItem[];
+    href: (taskId: string) => string;
+    onOpen: (taskId: string) => void;
+}) {
     return (
         <ul aria-label="Tasks" className="m-0 list-none border-t-rule border-divider p-0">
             {items.map((task) => {
@@ -302,6 +318,19 @@ function TaskRows({ items, href }: { items: TaskListItem[]; href: (taskId: strin
                         <Link
                             href={href(task.id)}
                             scroll={false}
+                            onClick={(event) => {
+                                // Plain clicks stay in the page; modified clicks (new tab) use the href.
+                                if (
+                                    event.button !== 0 ||
+                                    event.metaKey ||
+                                    event.ctrlKey ||
+                                    event.shiftKey ||
+                                    event.altKey
+                                )
+                                    return;
+                                event.preventDefault();
+                                onOpen(task.id);
+                            }}
                             className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 px-2 py-4 text-text no-underline hover:bg-[color-mix(in_srgb,var(--color-text)_4%,transparent)] hover:text-text focus-visible:[outline-offset:-2px]"
                         >
                             <span className="flex min-w-0 flex-col gap-1">

@@ -4,6 +4,8 @@ import { Search } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 
+import { shallowUrl } from '@/lib/hooks/shallowUrl';
+
 /** Routes whose task list reads ?q (the search applies in place). */
 const PROJECT_TASKS = /^\/dashboard\/projects\/[^/]+\/tasks$/;
 const MY_TASKS = '/dashboard/my-tasks';
@@ -51,7 +53,8 @@ export function HeaderSearch() {
             else params.delete('q');
             params.delete('page');
             const query = params.toString();
-            router.push(query ? `${pathname}?${query}` : pathname);
+            // Same page, new ?q: client-side URL state, no server round trip.
+            shallowUrl.push(query ? `${pathname}?${query}` : pathname);
             return;
         }
         router.push(q ? `${MY_TASKS}?q=${encodeURIComponent(q)}` : MY_TASKS);

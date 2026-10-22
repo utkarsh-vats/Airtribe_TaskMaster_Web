@@ -149,6 +149,32 @@ describe('unwrap', () => {
     });
 });
 
+describe('query serialisation', () => {
+    it('sends array params comma-separated (spec: style form, explode false)', async () => {
+        let search = '';
+        server.use(
+            http.get(url(`/projects/${PROJECT_ID}/tasks`), ({ request }) => {
+                search = new URL(request.url).search;
+                return HttpResponse.json({
+                    data: [],
+                    meta: { page: 1, limit: 25, total: 0, totalPages: 0 },
+                });
+            }),
+        );
+
+        await unwrapPage(
+            api.GET('/api/v1/projects/{projectId}/tasks', {
+                params: {
+                    path: { projectId: PROJECT_ID },
+                    query: { status: ['OPEN', 'COMPLETED'], priority: ['URGENT', 'HIGH'] },
+                },
+            }),
+        );
+
+        expect(search).toBe('?status=OPEN,COMPLETED&priority=URGENT,HIGH');
+    });
+});
+
 describe('unwrapPage', () => {
     it('returns items and meta from a paginated list', async () => {
         const meta = { page: 2, limit: 1, total: 3, totalPages: 3 };

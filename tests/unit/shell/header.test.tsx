@@ -2,12 +2,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { DashboardHeader, formatBadge } from '@/components/shell/DashboardHeader';
 import type { User } from '@/lib/api/types';
 import { resetRefreshForTests, startSession } from '@/lib/auth/refresh';
 import { sessionStore } from '@/lib/auth/store';
+import { shallowUrl } from '@/lib/hooks/shallowUrl';
 
 import { API_ORIGIN, server } from '../../msw/server';
 
@@ -63,14 +64,21 @@ function renderHeader(path = '/dashboard/my-tasks', search = '', onOpenNav = vi.
 
 const searchBox = () => screen.getByRole('searchbox', { name: 'Search tasks' });
 
+/** Same-page ?q updates use shallowUrl; going to My tasks uses the router. */
+let urlPush: MockInstance<(url: string) => void>;
+
 beforeEach(() => {
+    urlPush = vi.spyOn(shallowUrl, 'push').mockImplementation(() => {});
     sessionStore.reset();
     resetRefreshForTests();
     startSession({ accessToken: 'at', expiresIn: 900, user });
     nav.push.mockClear();
     nav.replace.mockClear();
 });
-afterEach(() => resetRefreshForTests());
+afterEach(() => {
+    resetRefreshForTests();
+    urlPush.mockRestore();
+});
 
 describe('search', () => {
     it('on a project task list sets ?q, keeps other params and resets page', async () => {
@@ -82,9 +90,10 @@ describe('search', () => {
 
         await u.type(searchBox(), 'hero copy{Enter}');
 
-        expect(nav.push).toHaveBeenCalledExactlyOnceWith(
+        expect(urlPush).toHaveBeenCalledExactlyOnceWith(
             '/dashboard/projects/p1/tasks?view=board&priority=HIGH&q=hero+copy',
         );
+        expect(nav.push).not.toHaveBeenCalled();
     });
 
     it('elsewhere opens My tasks with ?q', async () => {
@@ -104,7 +113,7 @@ describe('search', () => {
         await u.clear(searchBox());
         await u.type(searchBox(), '{Enter}');
 
-        expect(nav.push).toHaveBeenCalledExactlyOnceWith('/dashboard/my-tasks');
+        expect(urlPush).toHaveBeenCalledExactlyOnceWith('/dashboard/my-tasks');
     });
 
     it('ignores ?q on routes that are not task lists', () => {

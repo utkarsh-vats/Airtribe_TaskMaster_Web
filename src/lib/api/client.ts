@@ -41,6 +41,10 @@ export function createApiClient({
         // Look fetch up per request (openapi-fetch otherwise captures it once at creation),
         // so test interceptors and polyfills installed later still apply.
         fetch: (request) => globalThis.fetch(request),
+        // The spec declares array query params (status, priority) as `style: form,
+        // explode: false` — `priority=URGENT,HIGH`. openapi-fetch's default repeats the key,
+        // which the API rejects with a 422.
+        querySerializer: { array: { style: 'form', explode: false } },
     });
 
     /**
