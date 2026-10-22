@@ -1,6 +1,13 @@
-import { TasksPlaceholder } from './TasksPlaceholder';
+import { Suspense } from 'react';
 
-// Placeholder — the task list comes in step 6a. The title is set by ProjectShell.
+import { TaskListSkeleton, TaskListView } from '@/features/tasks/components/TaskListView';
+
+// The title is set by ProjectShell (project name).
 export default function ProjectTasksPage() {
-    return <TasksPlaceholder />;
+    return (
+        // TaskListView reads ?page / ?task; useSearchParams needs a Suspense boundary.
+        <Suspense fallback={<TaskListSkeleton />}>
+            <TaskListView />
+        </Suspense>
+    );
 }

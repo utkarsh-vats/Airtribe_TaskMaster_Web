@@ -2,6 +2,7 @@
 
 import { Plus } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+
 import { useState } from 'react';
 
 import { Button, ButtonLink } from '@/components/ui/Button';
@@ -10,6 +11,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { errorMessage } from '@/lib/api/messages';
+import { pageParam, useUrlWith } from '@/lib/hooks/useUrlWith';
 
 import { useProjects } from '../api';
 import { NewProjectDialog } from './NewProjectDialog';
@@ -18,12 +20,6 @@ import { ProjectCard } from './ProjectCard';
 export const PROJECTS_PAGE_SIZE = 24;
 
 const GRID = 'grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3';
-
-/** ?page as a positive integer (anything else → 1). */
-function pageParam(raw: string | null) {
-    const page = Number(raw);
-    return Number.isInteger(page) && page > 0 ? page : 1;
-}
 
 /** /dashboard/projects: card grid, pagination via ?page, New project (button or ?new=1). */
 export function ProjectsView() {
@@ -36,16 +32,7 @@ export function ProjectsView() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const openFromUrl = searchParams.get('new') === '1';
 
-    /** The current URL with some params changed (null removes). */
-    const urlWith = (changes: Record<string, string | null>) => {
-        const params = new URLSearchParams(searchParams.toString());
-        for (const [key, value] of Object.entries(changes)) {
-            if (value === null) params.delete(key);
-            else params.set(key, value);
-        }
-        const query = params.toString();
-        return query ? `${pathname}?${query}` : pathname;
-    };
+    const urlWith = useUrlWith();
 
     const setDialog = (open: boolean) => {
         setDialogOpen(open);
