@@ -19,11 +19,11 @@ import { sessionStore } from '@/lib/auth/store';
 import { API_ORIGIN, server } from '../../msw/server';
 
 const PATH = '/dashboard/projects/p1/tasks';
-const nav = vi.hoisted(() => ({ search: '', push: vi.fn() }));
+const nav = vi.hoisted(() => ({ search: '', push: vi.fn(), replace: vi.fn() }));
 vi.mock('next/navigation', () => ({
     usePathname: () => '/dashboard/projects/p1/tasks',
     useSearchParams: () => new URLSearchParams(nav.search),
-    useRouter: () => ({ push: nav.push, replace: vi.fn() }),
+    useRouter: () => ({ push: nav.push, replace: nav.replace }),
 }));
 
 const tasksUrl = `${API_ORIGIN}/api/v1/projects/p1/tasks`;
@@ -91,12 +91,24 @@ const TASKS: TaskListItem[] = [
 ];
 
 /** GET tasks serving `pages` (1-based); records the query strings. */
-function mockTasks(pages: TaskListItem[][], total = pages.flat().length) {
+function mockTasks(
+    pages: TaskListItem[][],
+    total = pages.flat().length,
+    counts: Partial<Record<string, number>> = {},
+) {
     const requests: string[] = [];
     server.use(
         http.get(tasksUrl, ({ request }) => {
             const url = new URL(request.url);
             requests.push(url.search);
+            if (url.searchParams.get('limit') === '1') {
+                const key = url.searchParams.get('status') ?? 'ALL';
+                const n = counts[key] ?? 0;
+                return HttpResponse.json({
+                    data: [],
+                    meta: { page: 1, limit: 1, total: n, totalPages: n },
+                });
+            }
             const page = Number(url.searchParams.get('page') ?? '1');
             return HttpResponse.json({
                 data: pages[page - 1] ?? [],
@@ -122,6 +134,9 @@ function renderList(search = '') {
     return userEvent.setup();
 }
 
+/** The list request(s) — the status counts ask for limit=1. */
+const listRequests = (requests: string[]) => requests.filter((r) => r.includes('limit=25'));
+
 const table = () => screen.getByTestId('task-table');
 const rows = () => screen.getByTestId('task-rows');
 
@@ -130,6 +145,7 @@ beforeEach(() => {
     resetRefreshForTests();
     startSession({ accessToken: 'at', expiresIn: 900, user });
     nav.push.mockClear();
+    nav.replace.mockClear();
 });
 afterEach(() => resetRefreshForTests());
 
@@ -265,13 +281,13 @@ describe('toolbar and pagination', () => {
         const u = renderList('page=2');
 
         await screen.findByText('60 tasks');
-        expect(requests).toEqual(['?page=2&limit=25']);
+        expect(listRequests(requests)).toEqual(['?page=2&limit=25']);
 
         await u.click(screen.getByRole('button', { name: /Next/ }));
-        expect(nav.push).toHaveBeenLastCalledWith(`${PATH}?page=3`);
+        expect(nav.push).toHaveBeenLastCalledWith(`${PATH}?page=3`, { scroll: false });
 
         await u.click(screen.getByRole('button', { name: /Previous/ }));
-        expect(nav.push).toHaveBeenLastCalledWith(PATH);
+        expect(nav.push).toHaveBeenLastCalledWith(PATH, { scroll: false });
     });
 });
 
@@ -333,5 +349,130 @@ describe('states', () => {
         await u.click(within(alert).getByRole('button', { name: /Try again/ }));
 
         expect(await screen.findByText('3 tasks')).toBeInTheDocument();
+    });
+});
+
+describe('status segmented control', () => {
+    const COUNTS = { ALL: 8, OPEN: 4, IN_PROGRESS: 2, COMPLETED: 2 };
+    const segment = (name: RegExp) => screen.getByRole('radio', { name });
+
+    it('shows a count per status ("–" while loading)', async () => {
+        mockTasks([TASKS], 8, COUNTS);
+        renderList();
+
+        expect(screen.getByRole('radio', { name: /All/ }).closest('label')).toHaveTextContent(
+            'All–',
+        );
+        await vi.waitFor(() => expect(segment(/All/).closest('label')).toHaveTextContent('All8'));
+        expect(segment(/To do/).closest('label')).toHaveTextContent('To do4');
+        expect(segment(/In progress/).closest('label')).toHaveTextContent('In progress2');
+        expect(segment(/Done/).closest('label')).toHaveTextContent('Done2');
+        expect(segment(/All/)).toBeChecked();
+    });
+
+    it('counts use the same search, without the status', async () => {
+        const requests = mockTasks([TASKS], 3, COUNTS);
+        renderList('status=OPEN&q=hero');
+
+        await screen.findByText('3 tasks');
+        await vi.waitFor(() =>
+            expect(requests.filter((r) => r.includes('limit=1'))).toHaveLength(4),
+        );
+        expect(requests.filter((r) => r.includes('limit=1')).sort()).toEqual(
+            [
+                '?q=hero&limit=1',
+                '?q=hero&status=OPEN&limit=1',
+                '?q=hero&status=IN_PROGRESS&limit=1',
+                '?q=hero&status=COMPLETED&limit=1',
+            ].sort(),
+        );
+    });
+
+    it('selecting To do sets status=OPEN and resets the page; All clears it', async () => {
+        mockTasks([TASKS], 3, COUNTS);
+        const u = renderList('page=3&task=t1');
+        await screen.findByText('3 tasks');
+
+        await u.click(segment(/To do/));
+        expect(nav.push).toHaveBeenLastCalledWith(`${PATH}?status=OPEN&task=t1`, { scroll: false });
+    });
+
+    it('All removes the status', async () => {
+        mockTasks([TASKS], 3, COUNTS);
+        const u = renderList('status=COMPLETED&q=x');
+        await screen.findByText('3 tasks');
+        expect(segment(/Done/)).toBeChecked();
+
+        await u.click(segment(/All/));
+        expect(nav.push).toHaveBeenLastCalledWith(`${PATH}?q=x`, { scroll: false });
+    });
+
+    it('highlights nothing when the URL combines several statuses', async () => {
+        mockTasks([TASKS], 3, COUNTS);
+        renderList('status=OPEN,COMPLETED');
+        await screen.findByText('3 tasks');
+
+        for (const name of [/All/, /To do/, /In progress/, /Done/]) {
+            expect(segment(name)).not.toBeChecked();
+        }
+    });
+
+    it('sends status and q with the list request, and shows the filtered total', async () => {
+        const requests = mockTasks([[TASKS[1] as TaskListItem]], 1);
+        renderList('status=OPEN&q=redirects&page=1');
+
+        expect(await screen.findByText('1 task')).toBeInTheDocument();
+        expect(listRequests(requests)).toEqual(['?status=OPEN&q=redirects&page=1&limit=25']);
+    });
+});
+
+describe('mobile search', () => {
+    const search = () =>
+        within(screen.getByTestId('task-toolbar')).getByRole('searchbox', { name: 'Search tasks' });
+
+    it('shows the current ?q and debounces typing into ?q with replace', async () => {
+        mockTasks([TASKS], 3);
+        const u = renderList('q=hero&page=2&task=t1');
+        await screen.findByText('3 tasks');
+        expect(search()).toHaveValue('hero');
+
+        await u.clear(search());
+        await u.type(search(), 'redirects');
+        expect(nav.replace).not.toHaveBeenCalled(); // still within the 300 ms pause
+
+        await vi.waitFor(() =>
+            expect(nav.replace).toHaveBeenCalledWith(`${PATH}?q=redirects&task=t1`, {
+                scroll: false,
+            }),
+        );
+        expect(nav.replace).toHaveBeenCalledOnce();
+        expect(nav.push).not.toHaveBeenCalled();
+    });
+
+    it('Esc clears the search at once', async () => {
+        mockTasks([TASKS], 3);
+        const u = renderList('q=hero&status=OPEN');
+        await screen.findByText('3 tasks');
+
+        search().focus();
+        await u.keyboard('{Escape}');
+
+        expect(search()).toHaveValue('');
+        expect(nav.replace).toHaveBeenCalledExactlyOnceWith(`${PATH}?status=OPEN`, {
+            scroll: false,
+        });
+    });
+});
+
+describe('filtered empty state', () => {
+    it('says "No tasks match" and Clear filters drops status and q', async () => {
+        mockTasks([[]], 0);
+        const u = renderList('status=COMPLETED&q=nothing&task=t1');
+
+        expect(await screen.findByRole('heading', { name: 'No tasks match' })).toBeInTheDocument();
+        expect(screen.getByText('Clear the search or pick another status.')).toBeInTheDocument();
+
+        await u.click(screen.getByRole('button', { name: 'Clear filters' }));
+        expect(nav.push).toHaveBeenLastCalledWith(PATH);
     });
 });

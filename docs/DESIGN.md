@@ -35,7 +35,7 @@ Next.js frontend for the TaskMaster API ([Airtribe_TaskMaster](https://github.co
 | Server state | TanStack Query | Caching, invalidation, optimistic updates, retries |
 | API types | Generated from the backend's `/openapi.json` with openapi-typescript; calls through openapi-fetch | Request/response types can't drift from the API |
 | Forms | react-hook-form + Zod (limits mirror the API) | Inline validation, 422 `details` map onto fields |
-| URL state | Filters, sort, page, view and the open task live in the URL (nuqs) | Shareable, back-button friendly |
+| URL state | Filters, sort, page, view and the open task live in the URL, read with `useSearchParams` and parsed with Zod (`src/features/tasks/filters.ts`); URLs built with the in-house `useUrlWith` helper — no nuqs | Shareable, back-button friendly; invalid params are dropped instead of breaking the page |
 | Live updates | `@microsoft/fetch-event-source` | Browser `EventSource` can't send an `Authorization` header |
 | Theme | `data-theme="light|dark"` on `<html>` via next-themes (`attribute="data-theme"`) | Matches the token files; no flash on load |
 
@@ -87,7 +87,7 @@ Three areas, each with its own layout: **marketing** (`(marketing)` route group)
 | `/dashboard/my-tasks` | Tasks assigned to me across projects | Same filter bar minus assignee; each row shows its project |
 | `/dashboard/projects` | Projects card grid (1 / 2 / 3 columns at < 820 / ≥ 820 / ≥ 1200 px), 24 per page via `?page=` | Mobile entry point; on desktop the sidebar covers it. `?new=1` opens the New project dialog (the sidebar's link); closing it drops the param with `replace`. Creating a project goes to its tasks |
 | `/dashboard/projects/[projectId]` | → `/dashboard/projects/[projectId]/tasks` | |
-| `/dashboard/projects/[projectId]/tasks` | List or board (`?view=list|board`), filters in the URL, task panel via `?task=<id>` | 25 per page via `?page=` (page 1 drops the param). Table from 820 px, rows below — both rendered, CSS shows one. `?task` (panel) and `?new=1` (New task dialog) are mutually exclusive: setting one removes the other |
+| `/dashboard/projects/[projectId]/tasks` | List or board (`?view=list|board`), filters in the URL, task panel via `?task=<id>` | Filters: `?status=` (comma list; the segmented control sets one value, and a multi-value link highlights no option), `?q=` (1–200 chars); invalid values are dropped. Filter params are written first in a fixed order; any filter change resets the page. Search below 820 px lives in the toolbar (debounced 300 ms, history replace). 25 per page via `?page=` (page 1 drops the param). Table from 820 px, rows below — both rendered, CSS shows one. `?task` (panel) and `?new=1` (New task dialog) are mutually exclusive: setting one removes the other |
 | `/dashboard/projects/[projectId]/discussion` | Project-level comments | Not in prototype — same thread component as the task panel |
 | `/dashboard/projects/[projectId]/files` | Project-level attachments | Not in prototype — same attachment list component |
 | `/dashboard/projects/[projectId]/members` | Invite form, members table, invitations table | Per prototype |

@@ -3,40 +3,76 @@
 import { clsx } from 'clsx';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback } from 'react';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
+import { Segmented } from '@/components/ui/Segmented';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Table, TableSkeleton, TBody, Td, Th, THead, Tr } from '@/components/ui/Table';
 import { PriorityMark, StatusTag } from '@/components/ui/Tag';
 import { useProjectContext } from '@/features/projects/ProjectContext';
 import { errorMessage } from '@/lib/api/messages';
-import type { TaskListItem } from '@/lib/api/types';
-import { pageParam, useUrlWith } from '@/lib/hooks/useUrlWith';
+import type { TaskListItem, TaskStatus } from '@/lib/api/types';
+import { STATUS_LABELS, TASK_STATUSES } from '@/lib/domain';
+import { useUrlWith } from '@/lib/hooks/useUrlWith';
 
-import { TASKS_PAGE_SIZE, useTasks } from '../api';
+import { useTasks, useTaskStatusCounts, type StatusCounts } from '../api';
+import {
+    filtersToSearch,
+    hasActiveFilters,
+    parseTaskFilters,
+    updateFilters,
+    type TaskFilters,
+} from '../filters';
 import { formatDue } from '../format';
+import { TaskSearch } from './TaskSearch';
 
 const firstLine = (text: string | null) => text?.split('\n').find((line) => line.trim()) ?? '';
 const countLabel = (total: number) => (total === 1 ? '1 task' : `${total} tasks`);
 
+type StatusOption = 'ALL' | TaskStatus;
+
 /**
- * A project's tasks (DESIGN.md §6): a table from 820px (prototype density B, no ID column —
- * the API has no task keys), rows below that (density A). Both are rendered and CSS shows one,
- * so there's no layout flash or hydration mismatch. Selecting a task sets ?task= (step 7a
- * opens the panel); New task sets ?new=1 (step 7d).
+ * A project's tasks (DESIGN.md §6): status segmented control with counts, search (toolbar
+ * below 820px; the header search above), then a table from 820px (prototype density B, no ID
+ * column — the API has no task keys) or rows below (density A). Both layouts are rendered and
+ * CSS shows one, so there's no layout flash or hydration mismatch. Filters live in the URL
+ * (filters.ts); selecting a task sets ?task= (7a), New task sets ?new=1 (7d).
  */
 export function TaskListView() {
     const { project } = useProjectContext();
     const router = useRouter();
+    const pathname = usePathname();
     const searchParams = useSearchParams();
     const urlWith = useUrlWith();
-    const page = pageParam(searchParams.get('page'));
-    const tasks = useTasks(project.id, { page, limit: TASKS_PAGE_SIZE });
+    const filters = parseTaskFilters(searchParams);
+    const tasks = useTasks(project.id, filters);
+    const counts = useTaskStatusCounts(project.id, filters);
+
+    /** URL for `next` filters, keeping the other params (task, new, view). */
+    const filterUrl = (next: TaskFilters) => {
+        const search = filtersToSearch(next, searchParams);
+        return search ? `${pathname}?${search}` : pathname;
+    };
+    const applyFilters = (changes: Partial<TaskFilters>) =>
+        router.push(filterUrl(updateFilters(filters, changes)), { scroll: false });
+
+    // Typing replaces the history entry instead of adding one per pause.
+    const searchKey = searchParams.toString();
+    const onSearch = useCallback(
+        (q: string) => {
+            const current = new URLSearchParams(searchKey);
+            const next = updateFilters(parseTaskFilters(current), { q: q || undefined });
+            const search = filtersToSearch(next, current);
+            router.replace(search ? `${pathname}?${search}` : pathname, { scroll: false });
+        },
+        [router, pathname, searchKey],
+    );
 
     // The task panel (?task) and the New task dialog (?new) never open together.
     const taskHref = (taskId: string) => urlWith({ task: taskId, new: null });
@@ -53,11 +89,25 @@ export function TaskListView() {
     );
 
     const toolbar = (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col gap-3" data-testid="task-toolbar">
+            <div className="flex flex-wrap items-center gap-3">
+                <StatusFilter
+                    status={filters.status}
+                    counts={counts}
+                    onChange={(option) =>
+                        applyFilters({ status: option === 'ALL' ? undefined : [option] })
+                    }
+                />
+                <TaskSearch
+                    value={filters.q ?? ''}
+                    onSearch={onSearch}
+                    className="min-w-[160px] flex-1 md:hidden"
+                />
+                <span className="ml-auto">{newTaskButton}</span>
+            </div>
             <span className="text-muted text-sm" aria-live="polite">
                 {tasks.data ? countLabel(tasks.data.meta.total) : ' '}
             </span>
-            <span className="ml-auto">{newTaskButton}</span>
         </div>
     );
 
@@ -90,12 +140,22 @@ export function TaskListView() {
         return (
             <div className="flex flex-col gap-4">
                 {toolbar}
-                {page > 1 ? (
+                {hasActiveFilters(filters) ? (
+                    <EmptyState
+                        title="No tasks match"
+                        body="Clear the search or pick another status."
+                        action={
+                            <Button variant="secondary" onClick={() => router.push(pathname)}>
+                                Clear filters
+                            </Button>
+                        }
+                    />
+                ) : filters.page > 1 ? (
                     <EmptyState
                         title="Nothing on this page"
                         body="There are fewer tasks than that."
                         action={
-                            <ButtonLink href={urlWith({ page: null })}>
+                            <ButtonLink href={filterUrl({ ...filters, page: 1 })}>
                                 Go to the first page
                             </ButtonLink>
                         }
@@ -128,11 +188,46 @@ export function TaskListView() {
                 </div>
             </div>
             <Pagination
-                page={page}
+                page={filters.page}
                 totalPages={meta.totalPages}
-                onPageChange={(next) =>
-                    router.push(urlWith({ page: next === 1 ? null : String(next) }))
-                }
+                onPageChange={(page) => applyFilters({ page })}
+            />
+        </div>
+    );
+}
+
+/** All · To do · In progress · Done with counts ("–" while loading). */
+function StatusFilter({
+    status,
+    counts,
+    onChange,
+}: {
+    status: TaskStatus[] | undefined;
+    counts: StatusCounts;
+    onChange: (option: StatusOption) => void;
+}) {
+    // A link combining several statuses matches no single option: highlight none.
+    const value: StatusOption | null = !status
+        ? 'ALL'
+        : status.length === 1
+          ? (status[0] ?? null)
+          : null;
+    const count = (option: StatusOption) => counts[option] ?? '–';
+
+    return (
+        <div className="max-w-full overflow-x-auto">
+            <Segmented<StatusOption>
+                aria-label="Status"
+                value={value}
+                onChange={onChange}
+                options={[
+                    { value: 'ALL', label: 'All', count: count('ALL') },
+                    ...TASK_STATUSES.map((s) => ({
+                        value: s,
+                        label: STATUS_LABELS[s],
+                        count: count(s),
+                    })),
+                ]}
             />
         </div>
     );

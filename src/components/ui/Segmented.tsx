@@ -6,13 +6,14 @@ import { useId, type ReactNode } from 'react';
 export type SegmentedOption<T extends string> = {
     value: T;
     label: ReactNode;
-    /** Shown after the label, dimmed (e.g. task counts). */
-    count?: number;
+    /** Shown after the label, dimmed (e.g. task counts, or "–" while loading). */
+    count?: number | string;
 };
 
 type SegmentedProps<T extends string> = {
     options: readonly SegmentedOption<T>[];
-    value: T;
+    /** null = no option selected (e.g. a URL combining several values). */
+    value: T | null;
     onChange: (value: T) => void;
     /** Accessible name of the group. */
     'aria-label': string;
