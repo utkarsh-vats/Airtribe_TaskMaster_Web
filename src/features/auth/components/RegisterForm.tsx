@@ -14,7 +14,7 @@ import { safeNext } from '@/lib/auth/safeNext';
 import { authFormError } from '../errors';
 import { registerSchema, type RegisterInput, type RegisterValues } from '../schemas';
 import { AuthSwitch, withNext } from './AuthSwitch';
-import { FormAlert, useFormAlert } from './FormAlert';
+import { FormAlert, useFormAlert } from '@/components/ui/FormAlert';
 import { PasswordInput } from './PasswordInput';
 import { SubmitButton } from './SubmitButton';
 

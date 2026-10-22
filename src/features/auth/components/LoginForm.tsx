@@ -13,7 +13,7 @@ import { safeNext } from '@/lib/auth/safeNext';
 import { authFormError } from '../errors';
 import { loginSchema, type LoginInput, type LoginValues } from '../schemas';
 import { AuthSwitch } from './AuthSwitch';
-import { FormAlert, useFormAlert } from './FormAlert';
+import { FormAlert, useFormAlert } from '@/components/ui/FormAlert';
 import { PasswordInput } from './PasswordInput';
 import { SubmitButton } from './SubmitButton';
 

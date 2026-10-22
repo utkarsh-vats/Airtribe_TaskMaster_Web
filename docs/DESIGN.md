@@ -85,7 +85,7 @@ Three areas, each with its own layout: **marketing** (`(marketing)` route group)
 | `/login`, `/register` | Auth split screen (accent panel + form) | Signed in → `/dashboard`. Prototype's segmented "Sign in / Create account" switch; `?next=` honoured |
 | `/dashboard` | → redirects to `/dashboard/my-tasks` | |
 | `/dashboard/my-tasks` | Tasks assigned to me across projects | Same filter bar minus assignee; each row shows its project |
-| `/dashboard/projects` | Projects grid / list | Mobile entry point; on desktop the sidebar covers it |
+| `/dashboard/projects` | Projects card grid (1 / 2 / 3 columns at < 820 / ≥ 820 / ≥ 1200 px), 24 per page via `?page=` | Mobile entry point; on desktop the sidebar covers it. `?new=1` opens the New project dialog (the sidebar's link); closing it drops the param with `replace`. Creating a project goes to its tasks |
 | `/dashboard/projects/[projectId]` | → `/dashboard/projects/[projectId]/tasks` | |
 | `/dashboard/projects/[projectId]/tasks` | List or board (`?view=list|board`), filters in the URL, task panel via `?task=<id>` | |
 | `/dashboard/projects/[projectId]/discussion` | Project-level comments | Not in prototype — same thread component as the task panel |
