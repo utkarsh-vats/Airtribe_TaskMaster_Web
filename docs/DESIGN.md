@@ -96,7 +96,7 @@ Three areas, each with its own layout: **marketing** (`(marketing)` route group)
 | `/dashboard/notifications` | Full notifications list | Header panel shows the latest 10 |
 | `/dashboard/profile` | Profile, password, sign out | Per prototype, plus bio and avatar URL |
 | `/dev/ui` | Component showcase | Dev only — `notFound()` in production |
-| not found | "Project not found" / generic 404 | The API returns 404 for projects you're not in |
+| not found | "Project not found" / generic 404 | The API returns 404 for projects you're not in (and 422 for a malformed id): both show "Project not found" inside the dashboard shell, with a link to `/dashboard/projects` |
 
 ---
 
@@ -129,7 +129,7 @@ The prototype was built on demo data. Where it differs from the API, the API win
 
 **Shell (≥ 820 px):** sticky header bar (brand, search, theme switch, notifications button with unread badge, profile menu). Search: on a project's task list or My tasks it sets `?q` in place (other params kept, page reset); anywhere else it opens My tasks with `?q`; `/` focuses it, Esc clears. The badge reads `meta.unreadCount` from `GET /notifications?unread=true&limit=1` (own query key, polled every 60 s while visible; SSE takes over in 12c), hidden at 0, `99+` above 99 over a 2-column body: a 240 px sidebar (sticky under the header, scrolls on its own, 2px right rule) and `main`. The sidebar (`SidebarNav`, shared with the drawer) has personal links — My tasks, Invitations (badge = pending invitations from `GET /users/me/invitations`), Notifications — then "Projects" from `GET /projects?limit=100` in API order (name truncated with a title, small role tag; "View all projects" when `meta.total` > 100; skeleton / compact error with retry / "No projects yet"), then *New project* → `/dashboard/projects?new=1`. Active links get `aria-current="page"` and the prototype's accent-100 highlight. **< 820 px:** the sidebar moves into a left drawer opened by the header's menu button; it closes on navigation (including a link to the current page), Esc or an overlay click, and returns focus to the menu button; project switching uses the prototype's select; search moves into the tasks toolbar.
 
-**Project header:** kicker "Project", role tag, name (h2), description, tabs: Tasks · Discussion · Files · Members · Settings (2px accent underline on the active tab, per prototype).
+**Project header:** kicker "Project", role tag, name (h2; below 820 px a select of my projects that keeps the current tab), description, tabs: Tasks · Discussion · Files · Members · Settings (2px accent underline on the active tab, per prototype). `src/app/dashboard/projects/[projectId]/layout.tsx` renders `ProjectShell`, which loads the project and provides `ProjectContext` (`project`, `myRole`, §8 permissions bound to the signed-in user). The page title "{name} · TaskMaster" is a React `<title>` rendered by the shell; the layout sets `title: null` because the server can't fetch the name (no token).
 
 **Task panel:** right-side sheet (full screen on mobile), deep-linked by `?task=`. Title as an auto-growing textarea; Status / Priority / Assignee / Due in a 2-column grid; Description; Attachments; Comments with composer; footer "Created by … · date" and Delete. Fields the user can't edit render read-only with a tooltip.
 
@@ -189,7 +189,7 @@ A dev-only `/dev/ui` page renders every component in both themes (the prototype'
 
 ## 8. Permissions in the UI
 
-UI checks only hide or disable controls; the API stays the authority. `myRole` comes from the project detail.
+UI checks only hide or disable controls; the API stays the authority. `myRole` comes from the project detail. The checks are pure helpers in `src/features/projects/permissions.ts`; components get them bound to the current user via `useProjectContext().can`.
 
 | Control | Shown / enabled for |
 |---|---|

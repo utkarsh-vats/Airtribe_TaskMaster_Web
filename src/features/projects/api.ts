@@ -24,6 +24,20 @@ export function useProjects({ page, limit = SIDEBAR_PROJECT_LIMIT }: ProjectPage
     });
 }
 
+/** One project with my role and its owner (GET /projects/{id}). 404 = missing or not a member. */
+export function useProject(projectId: string) {
+    return useQuery({
+        queryKey: queryKeys.projects.detail(projectId),
+        queryFn: ({ signal }) =>
+            unwrap(
+                api.GET('/api/v1/projects/{projectId}', {
+                    params: { path: { projectId } },
+                    signal,
+                }),
+            ),
+    });
+}
+
 export type CreateProjectInput = { name: string; description?: string | undefined };
 
 /** POST /projects (the caller becomes OWNER). Refreshes every projects list — sidebar too. */

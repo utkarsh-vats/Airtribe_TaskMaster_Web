@@ -1,11 +1,6 @@
-import type { Metadata } from 'next';
+import { TasksPlaceholder } from './TasksPlaceholder';
 
-export const metadata: Metadata = { title: 'Tasks' };
-
-// Placeholder — the project layout, tabs and task list come in steps 5d and 6.
-export default async function ProjectTasksPage({
-    params,
-}: PageProps<'/dashboard/projects/[projectId]/tasks'>) {
-    const { projectId } = await params;
-    return <h2 className="m-0 break-all">Project {projectId}</h2>;
+// Placeholder — the task list comes in step 6a. The title is set by ProjectShell.
+export default function ProjectTasksPage() {
+    return <TasksPlaceholder />;
 }
