@@ -41,3 +41,11 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
     if (isYesterday(date, now)) return 'Yesterday';
     return shortDate(iso, now);
 }
+
+const fullFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeStyle: 'short' });
+
+/** "Wednesday, October 28, 2026 at 11:59 PM" — for title attributes. */
+export function fullDateTime(iso: string): string {
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? '' : fullFormat.format(date);
+}

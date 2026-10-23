@@ -31,7 +31,9 @@ import {
     type TaskFilters,
 } from '../filters';
 import { formatDue } from '../format';
+import { openTaskPanel } from '../panelHistory';
 import { TaskFilterBar } from './TaskFilterBar';
+import { TaskPanel } from './TaskPanel';
 import { TaskSearch } from './TaskSearch';
 
 const firstLine = (text: string | null) => text?.split('\n').find((line) => line.trim()) ?? '';
@@ -47,6 +49,18 @@ type StatusOption = 'ALL' | TaskStatus;
  * (filters.ts); selecting a task sets ?task= (7a), New task sets ?new=1 (7d).
  */
 export function TaskListView() {
+    const { project } = useProjectContext();
+    const searchParams = useSearchParams();
+    return (
+        <>
+            <TaskListBody />
+            {/* ?task=<id> opens the detail sheet over the list, whatever state the list is in. */}
+            <TaskPanel projectId={project.id} taskId={searchParams.get('task')} />
+        </>
+    );
+}
+
+function TaskListBody() {
     const { project } = useProjectContext();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -78,7 +92,8 @@ export function TaskListView() {
 
     // The task panel (?task) and the New task dialog (?new) never open together.
     const taskHref = (taskId: string) => urlWith({ task: taskId, new: null });
-    const openTask = (taskId: string) => shallowUrl.push(taskHref(taskId));
+    // Pushes a history entry, so Back closes the panel (panelHistory.ts).
+    const openTask = (taskId: string) => openTaskPanel(taskHref(taskId), taskId);
 
     const newTaskButton = (
         <Button

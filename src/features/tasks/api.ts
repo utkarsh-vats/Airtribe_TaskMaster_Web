@@ -1,9 +1,9 @@
 'use client';
 
-import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api, unwrapPage } from '@/lib/api/client';
-import type { TaskStatus } from '@/lib/api/types';
+import { api, unwrap, unwrapPage } from '@/lib/api/client';
+import type { Task, TaskListItem, TaskStatus } from '@/lib/api/types';
 import { TASK_STATUSES } from '@/lib/domain';
 import { queryKeys } from '@/lib/query/keys';
 
@@ -65,4 +65,44 @@ export function useTaskStatusCounts(projectId: string, filters: TaskFilters): St
     return Object.fromEntries(
         variants.map((variant, i) => [variant, results[i]?.data]),
     ) as StatusCounts;
+}
+
+/** What the panel can show: the full task, or a list row standing in while it loads. */
+export type TaskView = Task | TaskListItem;
+
+/** Whether the detail-only fields (counts, contact details) are there. */
+export const isFullTask = (task: TaskView): task is Task => 'commentCount' in task;
+
+/** A row for this task in any cached task list (project lists, My tasks). */
+function findCachedRow(
+    queries: [readonly unknown[], unknown][],
+    taskId: string,
+): TaskListItem | undefined {
+    for (const [, data] of queries) {
+        if (typeof data !== 'object' || data === null || !('items' in data)) continue;
+        const items = (data as { items: TaskListItem[] }).items;
+        const row = items.find((item) => item.id === taskId);
+        if (row) return row;
+    }
+    return undefined;
+}
+
+/**
+ * One task (GET /projects/{pid}/tasks/{tid}). While it loads, a matching row from any cached
+ * list stands in, so the panel shows the title and status at once.
+ */
+export function useTask(projectId: string, taskId: string) {
+    const queryClient = useQueryClient();
+    return useQuery<TaskView>({
+        queryKey: queryKeys.tasks.detail(projectId, taskId),
+        queryFn: ({ signal }) =>
+            unwrap(
+                api.GET('/api/v1/projects/{projectId}/tasks/{taskId}', {
+                    params: { path: { projectId, taskId } },
+                    signal,
+                }),
+            ),
+        placeholderData: () =>
+            findCachedRow(queryClient.getQueriesData({ queryKey: queryKeys.tasks.root() }), taskId),
+    });
 }

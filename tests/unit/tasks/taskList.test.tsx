@@ -4,7 +4,7 @@
  * scope to the table (data-testid="task-table") or the rows (data-testid="task-rows").
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
@@ -273,18 +273,29 @@ describe('mobile row click', () => {
 describe('task panel vs New task dialog', () => {
     it('New task closes an open task; opening a task drops ?new', async () => {
         mockTasks([TASKS]);
-        const u = renderList('task=t1&new=1');
+        server.use(
+            http.get(`${API_ORIGIN}/api/v1/projects/p1`, () =>
+                HttpResponse.json({ data: project }),
+            ),
+            http.get(`${tasksUrl}/t1`, () =>
+                HttpResponse.json({ data: { ...TASKS[0], commentCount: 0, attachmentCount: 0 } }),
+            ),
+        );
+        renderList('task=t1&new=1');
+        // The open panel hides the page from the accessibility tree, hence `hidden`.
         await screen.findByText('3 tasks');
 
-        await u.click(screen.getByRole('button', { name: 'New task' }));
+        // Behind the modal in real use; this checks the URL logic only.
+        fireEvent.click(screen.getByRole('button', { name: 'New task', hidden: true }));
         expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?new=1`);
 
-        await u.click(within(table()).getByRole('row', { name: 'Set up 301 redirects' }));
-        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?task=t2`);
-        expect(within(rows()).getByRole('link', { name: /Cookie consent banner/ })).toHaveAttribute(
-            'href',
-            `${PATH}?task=t3`,
+        fireEvent.click(
+            within(table()).getByRole('row', { name: 'Set up 301 redirects', hidden: true }),
         );
+        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?task=t2`);
+        expect(
+            within(rows()).getByRole('link', { name: /Cookie consent banner/, hidden: true }),
+        ).toHaveAttribute('href', `${PATH}?task=t3`);
     });
 });
 
@@ -413,11 +424,11 @@ describe('status segmented control', () => {
 
     it('selecting To do sets status=OPEN and resets the page; All clears it', async () => {
         mockTasks([TASKS], 3, COUNTS);
-        const u = renderList('page=3&task=t1');
+        const u = renderList('page=3&view=board');
         await screen.findByText('3 tasks');
 
         await u.click(segment(/To do/));
-        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?status=OPEN&task=t1`);
+        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?status=OPEN&view=board`);
     });
 
     it('All removes the status', async () => {
@@ -455,7 +466,7 @@ describe('mobile search', () => {
 
     it('shows the current ?q and debounces typing into ?q with replace', async () => {
         mockTasks([TASKS], 3);
-        const u = renderList('q=hero&page=2&task=t1');
+        const u = renderList('q=hero&page=2&view=board');
         await screen.findByText('3 tasks');
         expect(search()).toHaveValue('hero');
 
@@ -464,7 +475,7 @@ describe('mobile search', () => {
         expect(urlReplace).not.toHaveBeenCalled(); // still within the 300 ms pause
 
         await vi.waitFor(() =>
-            expect(urlReplace).toHaveBeenCalledWith(`${PATH}?q=redirects&task=t1`),
+            expect(urlReplace).toHaveBeenCalledWith(`${PATH}?q=redirects&view=board`),
         );
         expect(urlReplace).toHaveBeenCalledOnce();
         expect(urlPush).not.toHaveBeenCalled();
@@ -486,7 +497,7 @@ describe('mobile search', () => {
 describe('filtered empty state', () => {
     it('says "No tasks match" and Clear filters drops status and q', async () => {
         mockTasks([[]], 0);
-        const u = renderList('status=COMPLETED&q=nothing&task=t1');
+        const u = renderList('status=COMPLETED&q=nothing&view=board');
 
         expect(await screen.findByRole('heading', { name: 'No tasks match' })).toBeInTheDocument();
         expect(screen.getByText('Clear the search or pick another status.')).toBeInTheDocument();
