@@ -16,6 +16,12 @@ import type { Task, TaskListItem, TaskPriority, TaskStatus } from '@/lib/api/typ
 import { TASK_STATUSES } from '@/lib/domain';
 import { queryKeys } from '@/lib/query/keys';
 
+import {
+    moveInColumnCaches,
+    restoreColumnCaches,
+    type ColumnMove,
+    type ColumnSnapshot,
+} from './boardCache';
 import { toQueryParams, type TaskFilters } from './filters';
 
 export const TASKS_PAGE_SIZE = 25;
@@ -50,16 +56,22 @@ export function useTasks(
 /** The most a board column loads: the API's page-size cap. */
 export const BOARD_COLUMN_LIMIT = 100;
 
+const boardColumnQuery = (status: TaskStatus, filters: TaskFilters) => ({
+    ...toQueryParams({ ...filters, status: [status] }),
+    limit: BOARD_COLUMN_LIMIT,
+});
+
+/** A board column's cache key, for moving cards between columns (boardCache.ts). */
+export const boardColumnKey = (projectId: string, status: TaskStatus, filters: TaskFilters) =>
+    queryKeys.tasks.list(projectId, boardColumnQuery(status, filters));
+
 /**
  * One board column (DESIGN.md §4): the first 100 tasks with this status, using the other
  * filters and the sort; any status filter in the URL is ignored. Keyed like any list, so
  * edits and deletes patch the columns too.
  */
 export function useBoardColumn(projectId: string, status: TaskStatus, filters: TaskFilters) {
-    const query = {
-        ...toQueryParams({ ...filters, status: [status] }),
-        limit: BOARD_COLUMN_LIMIT,
-    };
+    const query = boardColumnQuery(status, filters);
     return useQuery({
         queryKey: queryKeys.tasks.list(projectId, query),
         queryFn: ({ signal }) => fetchTasks(projectId, query, signal),
@@ -159,6 +171,10 @@ export type TaskUpdate = {
     patch: TaskPatch;
     /** For assigneeId: the person to show until the server answers (null = Unassigned). */
     assignee?: { id: string; name: string } | null;
+    /** The task, when the hook isn't bound to one (board moves). */
+    taskId?: string;
+    /** A status change dropped on the board: also move the card between the cached columns. */
+    columns?: ColumnMove;
 };
 
 export const TASK_STATUS_CONFLICT_MESSAGE = "Someone else changed this task's status — refreshed.";
@@ -176,20 +192,27 @@ const hasItems = (data: unknown): data is { items: Row[] } =>
     typeof data === 'object' && data !== null && 'items' in data && Array.isArray(data.items);
 
 /**
- * Edit one field of a task (PATCH /projects/{pid}/tasks/{tid}, DESIGN.md §7).
- *   - Optimistic: the detail and every cached list row (project lists, My tasks) change at once.
+ * Edit one field of a task (PATCH /projects/{pid}/tasks/{tid}, DESIGN.md §7). Bound to one
+ * task (the panel), or unbound with `taskId` in each update (the board).
+ *   - Optimistic: the detail and every cached list row (project lists, My tasks) change at once;
+ *     a board move also takes the card from its column to the top of the target column.
  *   - Rollback restores only the fields this update touched, so a failed title save can't undo
  *     a status change made meanwhile.
  *   - 409 (the API's concurrent-status check) → toast + refetch the detail; 422 → rejected to
  *     the caller, which shows the message under the field; anything else → error toast.
  *   - Afterwards the project's lists and status counts, and My tasks, are refetched.
  */
-export function useUpdateTask(projectId: string, taskId: string) {
+export function useUpdateTask(projectId: string, boundTaskId?: string) {
     const queryClient = useQueryClient();
-    const detailKey = queryKeys.tasks.detail(projectId, taskId);
+    const taskIdOf = (update: TaskUpdate) => {
+        const taskId = update.taskId ?? boundTaskId;
+        if (!taskId) throw new Error('useUpdateTask: no task id');
+        return taskId;
+    };
 
     /** Merge `fields` into the detail and every list row of this task; return the old values. */
-    const apply = (fields: Record<string, unknown>) => {
+    const apply = (taskId: string, fields: Record<string, unknown>) => {
+        const detailKey = queryKeys.tasks.detail(projectId, taskId);
         const previous: { key: readonly unknown[]; values: Record<string, unknown> }[] = [];
         const pick = (row: Row) =>
             Object.fromEntries(Object.keys(fields).map((key) => [key, row[key]]));
@@ -217,7 +240,10 @@ export function useUpdateTask(projectId: string, taskId: string) {
     };
 
     /** Put back the old values of just these fields. */
-    const restore = (previous: { key: readonly unknown[]; values: Record<string, unknown> }[]) => {
+    const restore = (
+        taskId: string,
+        previous: { key: readonly unknown[]; values: Record<string, unknown> }[],
+    ) => {
         for (const { key, values } of previous) {
             queryClient.setQueryData<unknown>(key, (data: unknown) => {
                 if (hasItems(data)) {
@@ -234,23 +260,42 @@ export function useUpdateTask(projectId: string, taskId: string) {
     };
 
     return useMutation({
-        mutationFn: ({ patch }: TaskUpdate) =>
+        mutationFn: (update: TaskUpdate) =>
             unwrap(
                 api.PATCH('/api/v1/projects/{projectId}/tasks/{taskId}', {
-                    params: { path: { projectId, taskId } },
-                    body: patch,
+                    params: { path: { projectId, taskId: taskIdOf(update) } },
+                    body: update.patch,
                 }),
             ),
         onMutate: async (update) => {
+            const taskId = taskIdOf(update);
             // Don't let an in-flight refetch overwrite the optimistic values.
             await queryClient.cancelQueries({ queryKey: queryKeys.tasks.root() });
-            return { previous: apply(patchedFields(update)) };
+            const previous = apply(taskId, patchedFields(update));
+            // After the field update, so restoring the columns and then the fields is exact.
+            let columns: ColumnSnapshot | null = null;
+            if (update.columns && 'status' in update.patch) {
+                columns = moveInColumnCaches(
+                    queryClient,
+                    update.columns,
+                    taskId,
+                    update.patch.status,
+                );
+            }
+            return { previous, columns };
         },
-        onError: (error, _update, context) => {
-            if (context) restore(context.previous);
+        onError: (error, update, context) => {
+            const taskId = taskIdOf(update);
+            if (context) {
+                if (context.columns) restoreColumnCaches(queryClient, context.columns);
+                restore(taskId, context.previous);
+            }
             if (isApiError(error) && error.status === 409) {
                 toast(TASK_STATUS_CONFLICT_MESSAGE);
-                void queryClient.invalidateQueries({ queryKey: detailKey });
+                // The project's columns, lists and this detail all refetch on settle.
+                void queryClient.invalidateQueries({
+                    queryKey: queryKeys.tasks.detail(projectId, taskId),
+                });
                 return;
             }
             if (hasCode(error, ERROR_CODES.VALIDATION_ERROR)) return; // the field shows it
@@ -258,8 +303,8 @@ export function useUpdateTask(projectId: string, taskId: string) {
         },
         onSuccess: (task) => {
             // The server's version wins (completedAt, updatedAt, …).
-            queryClient.setQueryData(detailKey, task);
-            apply({
+            queryClient.setQueryData(queryKeys.tasks.detail(projectId, task.id), task);
+            apply(task.id, {
                 title: task.title,
                 description: task.description,
                 status: task.status,
