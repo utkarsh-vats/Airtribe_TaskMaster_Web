@@ -61,7 +61,8 @@ function SidePanel({
                         }
                     }}
                     onCloseAutoFocus={(event) => {
-                        if (!returnFocusTo?.current) return;
+                        // A removed opener (e.g. the row of a just-deleted task) can't take focus.
+                        if (!returnFocusTo?.current?.isConnected) return;
                         event.preventDefault();
                         returnFocusTo.current.focus();
                     }}

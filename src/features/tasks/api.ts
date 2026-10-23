@@ -247,3 +247,53 @@ export function useUpdateTask(projectId: string, taskId: string) {
             ]),
     });
 }
+
+export const TASK_ALREADY_DELETED_MESSAGE = 'That task was already deleted.';
+
+/**
+ * Delete a task (DELETE /projects/{pid}/tasks/{tid}). Not optimistic: it's destructive, so the
+ * UI waits for the server. A 404 means someone got there first — treated as deleted
+ * (`alreadyDeleted: true`). Either way the task leaves the detail cache and every cached list
+ * (with meta.total decremented), then the project's lists, counts and My tasks are refetched.
+ * Other errors toast and reject, so a confirm dialog can stay open for a retry.
+ */
+export function useDeleteTask(projectId: string, taskId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (): Promise<{ alreadyDeleted: boolean }> => {
+            try {
+                await unwrap(
+                    api.DELETE('/api/v1/projects/{projectId}/tasks/{taskId}', {
+                        params: { path: { projectId, taskId } },
+                    }),
+                );
+                return { alreadyDeleted: false };
+            } catch (error) {
+                if (isApiError(error) && error.status === 404) return { alreadyDeleted: true };
+                throw error;
+            }
+        },
+        onSuccess: () => {
+            queryClient.removeQueries({
+                queryKey: queryKeys.tasks.detail(projectId, taskId),
+                exact: true,
+            });
+            for (const [key, data] of queryClient.getQueriesData({
+                queryKey: queryKeys.tasks.root(),
+            })) {
+                if (!hasItems(data) || !data.items.some((item) => item.id === taskId)) continue;
+                const meta = (data as { meta?: { total: number } }).meta;
+                queryClient.setQueryData(key, {
+                    ...data,
+                    items: data.items.filter((item) => item.id !== taskId),
+                    ...(meta ? { meta: { ...meta, total: Math.max(0, meta.total - 1) } } : {}),
+                });
+            }
+            // Not awaited: the panel closes at once and the lists catch up behind it.
+            void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(projectId) });
+            void queryClient.invalidateQueries({ queryKey: [...queryKeys.tasks.root(), 'mine'] });
+        },
+        onError: (error) => notifyError(error),
+    });
+}

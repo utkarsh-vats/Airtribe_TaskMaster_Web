@@ -1,10 +1,13 @@
 'use client';
 
 import { clsx } from 'clsx';
+import { Trash2 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
+import { toast } from 'sonner';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Sheet } from '@/components/ui/Sheet';
@@ -19,7 +22,13 @@ import { useSession } from '@/lib/auth/SessionProvider';
 import { fullDateTime, relativeTime } from '@/lib/format/dates';
 import { useUrlWith } from '@/lib/hooks/useUrlWith';
 
-import { isFullTask, useTask, type TaskView } from '../api';
+import {
+    isFullTask,
+    TASK_ALREADY_DELETED_MESSAGE,
+    useDeleteTask,
+    useTask,
+    type TaskView,
+} from '../api';
 import { formatDue } from '../format';
 import { closeTaskPanel, taskPanelOpener } from '../panelHistory';
 import {
@@ -35,13 +44,17 @@ type TaskPanelProps = {
     projectId: string;
     /** From ?task; null = closed. */
     taskId: string | null;
+    /** Where to land after deleting the task (e.g. the previous page); default: just close. */
+    afterDeleteUrl?: string | undefined;
 };
 
+export const TASK_DELETED_MESSAGE = 'Task deleted';
+
 /**
- * Task detail sheet (DESIGN.md §6 "Task panel"), opened by ?task=<id>. Read-only for now —
- * step 7b makes the fields editable. Takes the project id explicitly so My tasks can reuse it.
+ * Task detail sheet (DESIGN.md §6 "Task panel"), opened by ?task=<id>: fields editable per
+ * DESIGN.md §8, delete in the footer. Takes the project id explicitly so My tasks can reuse it.
  */
-export function TaskPanel({ projectId, taskId }: TaskPanelProps) {
+export function TaskPanel({ projectId, taskId, afterDeleteUrl }: TaskPanelProps) {
     const project = useProject(projectId);
     const urlWith = useUrlWith();
     const breadcrumb = `${project.data?.name ?? 'Project'} / Task`;
@@ -53,22 +66,43 @@ export function TaskPanel({ projectId, taskId }: TaskPanelProps) {
         () => ({ current: lastTaskId ? taskPanelOpener(lastTaskId) : null }),
         [lastTaskId],
     );
+    // A deleted task closes at once (not when the URL catches up) and its detail is never
+    // rendered again — a refetch would only flash "Task not found" while the sheet closes.
+    const [deletedId, setDeletedId] = useState<string | null>(null);
+    const shownId = taskId !== deletedId ? taskId : null;
+
+    const onDeleted = (id: string, alreadyDeleted: boolean) => {
+        setDeletedId(id);
+        closeTaskPanel(id, urlWith({ task: null }), afterDeleteUrl);
+        if (alreadyDeleted) toast(TASK_ALREADY_DELETED_MESSAGE);
+        else toast.success(TASK_DELETED_MESSAGE);
+    };
 
     return (
         <Sheet
-            open={taskId !== null}
+            open={shownId !== null}
             onOpenChange={(open) => {
                 if (!open && taskId) closeTaskPanel(taskId, urlWith({ task: null }));
             }}
             title={breadcrumb}
             returnFocusTo={returnFocus}
         >
-            {taskId && <TaskDetail projectId={projectId} taskId={taskId} />}
+            {shownId && <TaskDetail projectId={projectId} taskId={shownId} onDeleted={onDeleted} />}
         </Sheet>
     );
 }
 
-function TaskDetail({ projectId, taskId }: { projectId: string; taskId: string }) {
+type OnDeleted = (taskId: string, alreadyDeleted: boolean) => void;
+
+function TaskDetail({
+    projectId,
+    taskId,
+    onDeleted,
+}: {
+    projectId: string;
+    taskId: string;
+    onDeleted: OnDeleted;
+}) {
     const task = useTask(projectId, taskId);
     const urlWith = useUrlWith();
 
@@ -99,10 +133,18 @@ function TaskDetail({ projectId, taskId }: { projectId: string; taskId: string }
 
     if (!task.data) return <TaskDetailSkeleton />;
 
-    return <TaskBody projectId={projectId} task={task.data} />;
+    return <TaskBody projectId={projectId} task={task.data} onDeleted={onDeleted} />;
 }
 
-function TaskBody({ projectId, task }: { projectId: string; task: TaskView }) {
+function TaskBody({
+    projectId,
+    task,
+    onDeleted,
+}: {
+    projectId: string;
+    task: TaskView;
+    onDeleted: OnDeleted;
+}) {
     const full = isFullTask(task);
     const project = useProject(projectId);
     const { user } = useSession();
@@ -167,17 +209,82 @@ function TaskBody({ projectId, task }: { projectId: string; task: TaskView }) {
             />
             <PlaceholderSection title="Comments" count={full ? task.commentCount : undefined} />
 
-            <footer className="text-muted flex flex-wrap gap-x-3 gap-y-1 border-t-rule border-divider pt-3 text-[12px]">
-                <span>
-                    Created by {task.createdBy.name} · {relativeTime(task.createdAt)}
-                </span>
-                {task.completedAt && <span>Completed {relativeTime(task.completedAt)}</span>}
+            <footer className="flex flex-col gap-1 border-t-rule border-divider pt-3">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                    <div className="text-muted flex flex-wrap gap-x-3 gap-y-1 text-[12px]">
+                        <span>
+                            Created by {task.createdBy.name} · {relativeTime(task.createdAt)}
+                        </span>
+                        {task.completedAt && (
+                            <span>Completed {relativeTime(task.completedAt)}</span>
+                        )}
+                    </div>
+                    {can && (
+                        <DeleteTask
+                            projectId={projectId}
+                            task={task}
+                            allowed={can.deleteTask(task)}
+                            onDeleted={onDeleted}
+                        />
+                    )}
+                </div>
+                {can && !can.deleteTask(task) && (
+                    <p className="text-muted m-0 text-right text-[12px]">{DELETE_HINT}</p>
+                )}
             </footer>
         </article>
     );
 }
 
 export const READ_ONLY_HINT = 'Only the creator, the assignee or an admin can edit this task.';
+export const DELETE_HINT = 'Members can delete only tasks they created.';
+
+/** Ghost danger "Delete task" + confirm. Not optimistic: the dialog waits for the server. */
+function DeleteTask({
+    projectId,
+    task,
+    allowed,
+    onDeleted,
+}: {
+    projectId: string;
+    task: TaskView;
+    allowed: boolean;
+    onDeleted: OnDeleted;
+}) {
+    const remove = useDeleteTask(projectId, task.id);
+    const button = (
+        <Button variant="ghost" size="sm" danger disabled={!allowed}>
+            <Trash2 size={14} aria-hidden />
+            Delete task
+        </Button>
+    );
+
+    if (!allowed) {
+        // A disabled button gets no pointer/focus events: the span carries the tooltip.
+        return (
+            <Tooltip content={DELETE_HINT}>
+                <span tabIndex={0} className="inline-flex">
+                    {button}
+                </span>
+            </Tooltip>
+        );
+    }
+
+    return (
+        <ConfirmDialog
+            trigger={button}
+            title="Delete this task?"
+            description={`“${task.title}” and its comments and attachments will be permanently deleted. This can't be undone.`}
+            confirmLabel="Delete task"
+            destructive
+            onConfirm={async () => {
+                // Rejects on failure (already toasted), which keeps the dialog open to retry.
+                const { alreadyDeleted } = await remove.mutateAsync();
+                onDeleted(task.id, alreadyDeleted);
+            }}
+        />
+    );
+}
 
 function ReadOnlyDetails({ task }: { task: TaskView }) {
     const due = formatDue(task.dueDate, task.status);

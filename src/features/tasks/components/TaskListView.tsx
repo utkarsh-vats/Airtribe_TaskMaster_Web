@@ -51,11 +51,25 @@ type StatusOption = 'ALL' | TaskStatus;
 export function TaskListView() {
     const { project } = useProjectContext();
     const searchParams = useSearchParams();
+    const urlWith = useUrlWith();
+    const filters = parseTaskFilters(searchParams);
+    const tasks = useTasks(project.id, filters); // the list's own query (deduped)
+    // Deleting the only row of a page past the first lands on the previous page.
+    const previousPage = filters.page - 1;
+    const afterDeleteUrl =
+        previousPage >= 1 && tasks.data?.items.length === 1
+            ? urlWith({ task: null, page: previousPage > 1 ? String(previousPage) : null })
+            : undefined;
+
     return (
         <>
             <TaskListBody />
             {/* ?task=<id> opens the detail sheet over the list, whatever state the list is in. */}
-            <TaskPanel projectId={project.id} taskId={searchParams.get('task')} />
+            <TaskPanel
+                projectId={project.id}
+                taskId={searchParams.get('task')}
+                afterDeleteUrl={afterDeleteUrl}
+            />
         </>
     );
 }
