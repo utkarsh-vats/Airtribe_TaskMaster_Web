@@ -35,6 +35,28 @@ export function closeTaskPanel(taskId: string, urlWithoutTask: string, landingUr
     }
 }
 
+/*
+ * The New task dialog (?new=1) works the same way: the button pushes, and closing goes back
+ * if it was pushed in this tab, else replaces.
+ */
+let newTaskPushed = false;
+
+/** Open the New task dialog (push, so Back closes it). */
+export function openNewTaskDialog(url: string) {
+    newTaskPushed = true;
+    shallowUrl.push(url);
+}
+
+/** Close the New task dialog without leaving an extra history entry. */
+export function closeNewTaskDialog(urlWithoutNew: string) {
+    if (newTaskPushed) {
+        newTaskPushed = false;
+        window.history.back();
+    } else {
+        shallowUrl.replace(urlWithoutNew);
+    }
+}
+
 /** The element that opened this task's panel in this tab, if it's still on the page. */
 export function taskPanelOpener(taskId: string): HTMLElement | null {
     const opener = opened?.taskId === taskId ? opened.opener : null;
@@ -43,5 +65,6 @@ export function taskPanelOpener(taskId: string): HTMLElement | null {
 
 /** Tests only. */
 export function resetTaskPanelHistoryForTests() {
+    newTaskPushed = false;
     opened = null;
 }

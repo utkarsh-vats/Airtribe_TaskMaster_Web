@@ -31,7 +31,8 @@ import {
     type TaskFilters,
 } from '../filters';
 import { formatDue } from '../format';
-import { openTaskPanel } from '../panelHistory';
+import { openNewTaskDialog, openTaskPanel } from '../panelHistory';
+import { NewTaskDialog } from './NewTaskDialog';
 import { TaskFilterBar } from './TaskFilterBar';
 import { TaskPanel } from './TaskPanel';
 import { TaskSearch } from './TaskSearch';
@@ -70,6 +71,7 @@ export function TaskListView() {
                 taskId={searchParams.get('task')}
                 afterDeleteUrl={afterDeleteUrl}
             />
+            <NewTaskDialog projectId={project.id} open={searchParams.get('new') === '1'} />
         </>
     );
 }
@@ -112,7 +114,8 @@ function TaskListBody() {
     const newTaskButton = (
         <Button
             variant="primary"
-            onClick={() => shallowUrl.push(urlWith({ new: '1', task: null }))}
+            // Pushes an entry, so Back closes the dialog (panelHistory.ts).
+            onClick={() => openNewTaskDialog(urlWith({ new: '1', task: null }))}
         >
             <Plus aria-hidden size={14} />
             New task

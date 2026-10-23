@@ -297,3 +297,29 @@ export function useDeleteTask(projectId: string, taskId: string) {
         onError: (error) => notifyError(error),
     });
 }
+
+export type CreateTaskInput = {
+    title: string;
+    description?: string;
+    priority?: TaskPriority;
+    assigneeId?: string;
+    dueDate?: string;
+};
+
+/** POST /projects/{pid}/tasks (always created OPEN). Refreshes the project's lists and counts, and My tasks. */
+export function useCreateTask(projectId: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (body: CreateTaskInput) =>
+            unwrap(
+                api.POST('/api/v1/projects/{projectId}/tasks', {
+                    params: { path: { projectId } },
+                    body,
+                }),
+            ),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(projectId) });
+            void queryClient.invalidateQueries({ queryKey: [...queryKeys.tasks.root(), 'mine'] });
+        },
+    });
+}
