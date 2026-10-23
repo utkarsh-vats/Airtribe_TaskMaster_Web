@@ -1,8 +1,8 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useImperativeHandle, useState, type Ref } from 'react';
-import { useForm } from 'react-hook-form';
+import { useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { useForm, useWatch, type Control } from 'react-hook-form';
 
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -12,12 +12,14 @@ import { FormAlert, useFormAlert } from '@/components/ui/FormAlert';
 import { DateField, Input, NativeSelect } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { toast } from '@/components/ui/Toaster';
+import { AiDraftRow } from '@/features/ai/components/AiDraftRow';
 import { useProjectMembers } from '@/features/members/api';
 import { ERROR_CODES, hasCode } from '@/lib/api/errors';
 import { applyFieldErrors } from '@/lib/api/forms';
 import { errorMessage } from '@/lib/api/messages';
 import { PRIORITY_LABELS, TASK_PRIORITIES } from '@/lib/domain';
 import { useUrlWith } from '@/lib/hooks/useUrlWith';
+import { mergeRefs } from '@/lib/react/mergeRefs';
 
 import { useCreateTask, type CreateTaskInput } from '../api';
 import { closeNewTaskDialog, openTaskPanel } from '../panelHistory';
@@ -104,6 +106,8 @@ function NewTaskForm({
         handleSubmit,
         setError,
         getValues,
+        setValue,
+        control,
         formState: { errors },
     } = useForm<NewTaskFormInput, unknown, NewTaskFormValues>({
         resolver: zodResolver(newTaskSchema),
@@ -120,6 +124,19 @@ function NewTaskForm({
         }),
         [getValues],
     );
+
+    // The description element, for focus and the cursor after an AI draft.
+    const descriptionEl = useRef<HTMLTextAreaElement>(null);
+    const { ref: descriptionRef, ...descriptionField } = register('description');
+    const putDescription = (text: string) => {
+        setValue('description', text, { shouldDirty: true });
+        const el = descriptionEl.current;
+        if (!el) return;
+        // A programmatic value doesn't fire `input`: let the auto-grow textarea refit.
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.focus();
+        el.setSelectionRange(text.length, text.length);
+    };
 
     const people = (members.data ?? [])
         .map((member) => member.user)
@@ -163,12 +180,13 @@ function NewTaskForm({
             <Field label="Title" required error={errors.title?.message}>
                 <Input autoFocus placeholder="What needs doing?" {...register('title')} />
             </Field>
-            {/* 7e: the AI suggestions button goes here, under the title. */}
+            <AiDraft control={control} onDescription={putDescription} />
             <Field label="Description" error={errors.description?.message}>
                 <Textarea
                     autoGrow
                     placeholder="Details, links, acceptance criteria"
-                    {...register('description')}
+                    ref={mergeRefs(descriptionEl, descriptionRef)}
+                    {...descriptionField}
                 />
             </Field>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -205,4 +223,16 @@ function NewTaskForm({
             </DialogActions>
         </form>
     );
+}
+
+/** The AI row, watching title and description on its own so typing doesn't re-render the form. */
+function AiDraft({
+    control,
+    onDescription,
+}: {
+    control: Control<NewTaskFormInput, unknown, NewTaskFormValues>;
+    onDescription: (text: string) => void;
+}) {
+    const [title, description] = useWatch({ control, name: ['title', 'description'] });
+    return <AiDraftRow title={title} description={description} onDescription={onDescription} />;
 }

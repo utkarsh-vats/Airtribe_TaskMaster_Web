@@ -120,7 +120,7 @@ The prototype was built on demo data. Where it differs from the API, the API win
 | Register hint "one number" | API only requires 8–128 characters; hint says "At least 8 characters" |
 | List density A / B / C (demo toggle) | Desktop: table (B). Below 820 px: rows (A). Grouped (C) is dropped |
 | Profile: name + email | Adds bio (≤ 500) and avatar URL; email stays read-only |
-| AI draft (priority + checklist JSON) | Uses `POST /ai/task-description` → plain description only. 503 hides the button; 502 shows "AI couldn't respond, try again" |
+| AI draft (priority + checklist JSON) | Uses `POST /ai/task-description` → plain description only, in the New task dialog (not the panel). Sends the trimmed title, plus the description typed so far as `notes`. The draft replaces the description; an Undo button restores the previous text until the description is edited or drafted again. 503 `AI_DISABLED` shows "AI drafting isn't available right now." for that open dialog and hides the row for the rest of the browser session (in memory, not storage); 502 shows "AI couldn't respond — try again."; 429 shows "Too many AI requests — wait a minute." Closing the dialog aborts the request |
 | Task panel has comments only | Adds an Attachments section (upload, list, download, delete) |
 
 ---
@@ -133,7 +133,7 @@ The prototype was built on demo data. Where it differs from the API, the API win
 
 **Task panel:** right-side sheet (full screen on mobile), deep-linked by `?task=`. Title as an auto-growing textarea; Status / Priority / Assignee / Due in a 2-column grid; Description; Attachments; Comments with composer; footer "Created by … · date" and Delete. Fields the user can't edit render read-only with a tooltip. Opening from the list pushes a history entry (Back closes it); closing from inside — X, Esc, overlay — goes back when this tab pushed that entry and otherwise (deep link, reload) replaces the URL without `?task`, so there's never a duplicate entry; focus returns to the row that opened it (`src/features/tasks/panelHistory.ts`). While the detail loads, the matching cached list row is shown as placeholder data; detail-only fields (counts) appear when it arrives. 404 / 422 → "Task not found".
 
-**New task dialog:** a 580 px modal, open while `?new=1` is on the tasks route. Fields: Title (required, 1–200, autofocused), Description (≤ 5000), then Priority (default Medium) / Assignee (default Unassigned, then members by name) / Due date in one row. There's no status field (the API creates every task OPEN), and room is left under the title for the AI button (7e). The body sends only the fields that are set; the due date is end of that day in the user's timezone. On success the dialog closes and a "Task created" toast offers **Open**, which opens the new task's panel. Closing (Cancel, Esc, overlay, X) with a title or description typed asks "Discard this task?" (Discard / Keep editing); a clean form closes at once, and it resets each time it opens. A 422 maps `assigneeId` → Assignee and `dueDate` → Due date; anything it can't place, and any other error, shows in a FormAlert at the top. History works like the panel's: the New task button pushes `?new=1`, and closing goes back when this tab pushed it, otherwise it replaces the URL.
+**New task dialog:** a 580 px modal, open while `?new=1` is on the tasks route. Fields: Title (required, 1–200, autofocused), Description (≤ 5000), then Priority (default Medium) / Assignee (default Unassigned, then members by name) / Due date in one row. There's no status field (the API creates every task OPEN), and the AI draft row sits under the title (§5): its state isn't part of the dirty check. The body sends only the fields that are set; the due date is end of that day in the user's timezone. On success the dialog closes and a "Task created" toast offers **Open**, which opens the new task's panel. Closing (Cancel, Esc, overlay, X) with a title or description typed asks "Discard this task?" (Discard / Keep editing); a clean form closes at once, and it resets each time it opens. A 422 maps `assigneeId` → Assignee and `dueDate` → Due date; anything it can't place, and any other error, shows in a FormAlert at the top. History works like the panel's: the New task button pushes `?new=1`, and closing goes back when this tab pushed it, otherwise it replaces the URL.
 
 **Component inventory** (`src/components/ui/`), each a thin React wrapper over the Modernist classes:
 
@@ -187,7 +187,7 @@ A dev-only `/dev/ui` page renders every component in both themes (the prototype'
 | 413 / 415 | inline under the upload area ("Max 10 MB" / "That file type isn't allowed") |
 | 422 | `details[].path` → field errors; anything unmatched → toast |
 | 429 | toast "Too many attempts — try again in a minute" |
-| 502 / 503 (AI) | inline message next to the AI button / button hidden |
+| 502 / 503 (AI) | inline message next to the AI button (button stays) / unavailable message for this dialog, then the row is hidden for the session |
 | network / 5xx | toast with a Retry action; queries show ErrorState |
 
 ---
