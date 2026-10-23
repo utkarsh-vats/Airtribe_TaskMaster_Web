@@ -19,7 +19,10 @@ import {
 import { signOut, signOutEverywhere } from '@/lib/auth/actions';
 import { useSession } from '@/lib/auth/SessionProvider';
 
-/** Header profile menu: avatar + first name; Profile, Sign out, Sign out of all devices. */
+/**
+ * Header profile menu: avatar + first name (avatar only below 480px); Profile, Sign out, Sign
+ * out of all devices.
+ */
 export function ProfileMenu() {
     const { user } = useSession();
     const router = useRouter();
@@ -41,7 +44,7 @@ export function ProfileMenu() {
                         className="gap-2 py-1 pr-2 pl-1"
                     >
                         <Avatar name={user.name} src={user.avatarUrl} size="sm" />
-                        <span className="hidden sm:inline">{firstName}</span>
+                        <span className="hidden min-[480px]:inline">{firstName}</span>
                         <ChevronDown aria-hidden size={14} />
                     </Button>
                 </MenuTrigger>

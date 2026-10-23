@@ -17,7 +17,8 @@ export const formatBadge = (count: number) => (count > 99 ? '99+' : String(count
 /**
  * The signed-in app's header bar (prototype `.nav`): menu button (below 820px), brand,
  * search (820px and up), theme switch, notifications with unread badge, profile menu.
- * Sticky, full width, 2px rule underneath.
+ * Sticky, full width, 2px rule underneath. Below 480px the gaps and padding tighten and the
+ * profile trigger drops the name, so the bar fits a 360px screen; only the brand can shrink.
  */
 export function DashboardHeader({
     onOpenNav,
@@ -28,7 +29,7 @@ export function DashboardHeader({
     menuButtonRef?: Ref<HTMLButtonElement>;
 }) {
     return (
-        <header className="nav sticky top-0 z-30 h-[var(--tm-header-h)] gap-3 bg-bg">
+        <header className="nav sticky top-0 z-30 h-[var(--tm-header-h)] gap-2 bg-bg px-3 min-[480px]:gap-3 min-[480px]:px-4 [&>*:not(.nav-brand)]:flex-none">
             <Button
                 variant="secondary"
                 iconOnly
