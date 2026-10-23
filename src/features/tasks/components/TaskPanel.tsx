@@ -10,15 +10,26 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Sheet } from '@/components/ui/Sheet';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PriorityMark, StatusTag } from '@/components/ui/Tag';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { useProject } from '@/features/projects/api';
+import { bindPermissions } from '@/features/projects/permissions';
 import { isApiError } from '@/lib/api/errors';
 import { errorMessage } from '@/lib/api/messages';
+import { useSession } from '@/lib/auth/SessionProvider';
 import { fullDateTime, relativeTime } from '@/lib/format/dates';
 import { useUrlWith } from '@/lib/hooks/useUrlWith';
 
 import { isFullTask, useTask, type TaskView } from '../api';
 import { formatDue } from '../format';
 import { closeTaskPanel, taskPanelOpener } from '../panelHistory';
+import {
+    AssigneeField,
+    DescriptionField,
+    DueField,
+    PriorityField,
+    StatusField,
+    TitleField,
+} from './TaskFields';
 
 type TaskPanelProps = {
     projectId: string;
@@ -88,62 +99,67 @@ function TaskDetail({ projectId, taskId }: { projectId: string; taskId: string }
 
     if (!task.data) return <TaskDetailSkeleton />;
 
-    return <TaskBody task={task.data} />;
+    return <TaskBody projectId={projectId} task={task.data} />;
 }
 
-function TaskBody({ task }: { task: TaskView }) {
-    const due = formatDue(task.dueDate, task.status);
+function TaskBody({ projectId, task }: { projectId: string; task: TaskView }) {
     const full = isFullTask(task);
+    const project = useProject(projectId);
+    const { user } = useSession();
+    // Permissions from the cached project + the signed-in user (works outside ProjectContext,
+    // e.g. on My tasks). Editing waits for the full task.
+    const can = project.data && user ? bindPermissions(project.data.myRole, user.id) : null;
+    const editable = full && can !== null && can.editTask(task);
+    const readOnlyHint = full && can !== null && !editable;
 
     return (
         <article aria-busy={!full || undefined} className="flex flex-col gap-4">
-            <h3 className="m-0 font-heading text-[26px] leading-[1.15] break-words">
-                {task.title}
-            </h3>
+            {editable ? (
+                <TitleField projectId={projectId} task={task} />
+            ) : (
+                <h3 className="m-0 font-heading text-[26px] leading-[1.15] break-words">
+                    {task.title}
+                </h3>
+            )}
 
-            <dl className="m-0 grid grid-cols-1 gap-3 md:grid-cols-2">
-                <Detail label="Status">
-                    <StatusTag status={task.status} />
-                </Detail>
-                <Detail label="Priority">
-                    <PriorityMark priority={task.priority} />
-                </Detail>
-                <Detail label="Assignee">
-                    {task.assignee ? (
-                        <span className="flex min-w-0 items-center gap-2 text-sm">
-                            <Avatar name={task.assignee.name} size="sm" />
-                            <span className="truncate">{task.assignee.name}</span>
-                        </span>
-                    ) : (
-                        <span className="text-muted text-sm">Unassigned</span>
-                    )}
-                </Detail>
-                <Detail label="Due">
-                    <span
-                        className={clsx('text-sm', due.overdue && 'font-bold text-danger')}
-                        title={task.dueDate ? fullDateTime(task.dueDate) : undefined}
+            {editable ? (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <StatusField projectId={projectId} task={task} />
+                    <PriorityField projectId={projectId} task={task} />
+                    <AssigneeField projectId={projectId} task={task} />
+                    <DueField projectId={projectId} task={task} />
+                </div>
+            ) : readOnlyHint ? (
+                <Tooltip content={READ_ONLY_HINT}>
+                    {/* Focusable so keyboard users get the explanation too. */}
+                    <div tabIndex={0} aria-label={`Task details. ${READ_ONLY_HINT}`}>
+                        <ReadOnlyDetails task={task} />
+                    </div>
+                </Tooltip>
+            ) : (
+                <ReadOnlyDetails task={task} />
+            )}
+
+            {editable ? (
+                <DescriptionField projectId={projectId} task={task} />
+            ) : (
+                <section aria-labelledby="task-description" className="flex flex-col gap-1">
+                    <h4
+                        id="task-description"
+                        className="text-muted m-0 text-[12px] font-normal tracking-normal"
                     >
-                        {due.label}
-                    </span>
-                </Detail>
-            </dl>
-
-            <section aria-labelledby="task-description" className="flex flex-col gap-1">
-                <h4
-                    id="task-description"
-                    className="text-muted m-0 text-[12px] font-normal tracking-normal"
-                >
-                    Description
-                </h4>
-                {task.description ? (
-                    // Plain text: line breaks kept, never rendered as HTML.
-                    <p className="m-0 text-sm break-words whitespace-pre-wrap">
-                        {task.description}
-                    </p>
-                ) : (
-                    <p className="text-muted m-0 text-sm">No description</p>
-                )}
-            </section>
+                        Description
+                    </h4>
+                    {task.description ? (
+                        // Plain text: line breaks kept, never rendered as HTML.
+                        <p className="m-0 text-sm break-words whitespace-pre-wrap">
+                            {task.description}
+                        </p>
+                    ) : (
+                        <p className="text-muted m-0 text-sm">No description</p>
+                    )}
+                </section>
+            )}
 
             <PlaceholderSection
                 title="Attachments"
@@ -158,6 +174,40 @@ function TaskBody({ task }: { task: TaskView }) {
                 {task.completedAt && <span>Completed {relativeTime(task.completedAt)}</span>}
             </footer>
         </article>
+    );
+}
+
+export const READ_ONLY_HINT = 'Only the creator, the assignee or an admin can edit this task.';
+
+function ReadOnlyDetails({ task }: { task: TaskView }) {
+    const due = formatDue(task.dueDate, task.status);
+    return (
+        <dl className="m-0 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Detail label="Status">
+                <StatusTag status={task.status} />
+            </Detail>
+            <Detail label="Priority">
+                <PriorityMark priority={task.priority} />
+            </Detail>
+            <Detail label="Assignee">
+                {task.assignee ? (
+                    <span className="flex min-w-0 items-center gap-2 text-sm">
+                        <Avatar name={task.assignee.name} size="sm" />
+                        <span className="truncate">{task.assignee.name}</span>
+                    </span>
+                ) : (
+                    <span className="text-muted text-sm">Unassigned</span>
+                )}
+            </Detail>
+            <Detail label="Due">
+                <span
+                    className={clsx('text-sm', due.overdue && 'font-bold text-danger')}
+                    title={task.dueDate ? fullDateTime(task.dueDate) : undefined}
+                >
+                    {due.label}
+                </span>
+            </Detail>
+        </dl>
     );
 }
 

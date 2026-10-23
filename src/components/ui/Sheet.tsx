@@ -49,6 +49,17 @@ function SidePanel({
                 <DialogPrimitive.Content
                     data-side={side}
                     className={clsx('tm-sheet', className)}
+                    // An editor with unsaved text (marked data-keep-open-on-escape) handles Esc
+                    // itself — e.g. reverting a title — instead of the panel closing.
+                    onEscapeKeyDown={(event) => {
+                        const target = event.target;
+                        if (
+                            target instanceof Element &&
+                            target.closest('[data-keep-open-on-escape]')
+                        ) {
+                            event.preventDefault();
+                        }
+                    }}
                     onCloseAutoFocus={(event) => {
                         if (!returnFocusTo?.current) return;
                         event.preventDefault();

@@ -152,6 +152,13 @@ a.btn-ghost:hover {
     width: min(300px, 85vw);
     border-right: 2px solid var(--color-divider);
 }
+/* The container is focused programmatically (focus trap); its controls keep their own rings. */
+.tm-sheet:focus,
+.tm-sheet:focus-visible,
+.tm-dialog:focus,
+.tm-dialog:focus-visible {
+    outline: none;
+}
 .tm-sheet-header {
     position: sticky;
     top: 0;

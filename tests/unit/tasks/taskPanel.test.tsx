@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
+import { TooltipProvider } from '@/components/ui/Tooltip';
 import { bindPermissions } from '@/features/projects/permissions';
 import { ProjectContext } from '@/features/projects/ProjectContext';
 import { TaskListView } from '@/features/tasks/components/TaskListView';
@@ -31,8 +32,10 @@ vi.mock('next/navigation', () => ({
 
 const tasksUrl = `${API_ORIGIN}/api/v1/projects/p1/tasks`;
 
+// A member who neither created nor is assigned the task: the panel is read-only for them
+// (editing is covered by taskEdit.test.tsx).
 const user: User = {
-    id: 'u1',
+    id: 'u-viewer',
     email: 'mara@taskmaster.app',
     name: 'Mara Okafor',
     bio: null,
@@ -47,7 +50,7 @@ const project: ProjectDetail = {
     description: null,
     createdAt: '2026-10-01T09:00:00.000Z',
     updatedAt: '2026-10-01T09:00:00.000Z',
-    myRole: 'OWNER',
+    myRole: 'MEMBER',
     memberCount: 3,
     owner: null,
 };
@@ -107,11 +110,13 @@ let historyBack: MockInstance<() => void>;
 function ui() {
     return (
         <QueryClientProvider client={client}>
-            <ProjectContext
-                value={{ project, myRole: 'OWNER', can: bindPermissions('OWNER', 'u1') }}
-            >
-                <TaskListView />
-            </ProjectContext>
+            <TooltipProvider>
+                <ProjectContext
+                    value={{ project, myRole: 'MEMBER', can: bindPermissions('MEMBER', user.id) }}
+                >
+                    <TaskListView />
+                </ProjectContext>
+            </TooltipProvider>
         </QueryClientProvider>
     );
 }
