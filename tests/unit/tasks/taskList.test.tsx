@@ -424,11 +424,11 @@ describe('status segmented control', () => {
 
     it('selecting To do sets status=OPEN and resets the page; All clears it', async () => {
         mockTasks([TASKS], 3, COUNTS);
-        const u = renderList('page=3&view=board');
+        const u = renderList('page=3&ref=mail');
         await screen.findByText('3 tasks');
 
         await u.click(segment(/To do/));
-        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?status=OPEN&view=board`);
+        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?status=OPEN&ref=mail`);
     });
 
     it('All removes the status', async () => {
@@ -466,7 +466,7 @@ describe('mobile search', () => {
 
     it('shows the current ?q and debounces typing into ?q with replace', async () => {
         mockTasks([TASKS], 3);
-        const u = renderList('q=hero&page=2&view=board');
+        const u = renderList('q=hero&page=2&ref=mail');
         await screen.findByText('3 tasks');
         expect(search()).toHaveValue('hero');
 
@@ -475,7 +475,7 @@ describe('mobile search', () => {
         expect(urlReplace).not.toHaveBeenCalled(); // still within the 300 ms pause
 
         await vi.waitFor(() =>
-            expect(urlReplace).toHaveBeenCalledWith(`${PATH}?q=redirects&view=board`),
+            expect(urlReplace).toHaveBeenCalledWith(`${PATH}?q=redirects&ref=mail`),
         );
         expect(urlReplace).toHaveBeenCalledOnce();
         expect(urlPush).not.toHaveBeenCalled();
@@ -497,7 +497,7 @@ describe('mobile search', () => {
 describe('filtered empty state', () => {
     it('says "No tasks match" and Clear filters drops status and q', async () => {
         mockTasks([[]], 0);
-        const u = renderList('status=COMPLETED&q=nothing&view=board');
+        const u = renderList('status=COMPLETED&q=nothing');
 
         expect(await screen.findByRole('heading', { name: 'No tasks match' })).toBeInTheDocument();
         expect(screen.getByText('Clear the search or pick another status.')).toBeInTheDocument();

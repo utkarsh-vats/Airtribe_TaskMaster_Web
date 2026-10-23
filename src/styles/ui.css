@@ -434,6 +434,12 @@ a.seg-opt:focus-visible {
     outline-offset: -2px;
 }
 
+/* — small segmented control — */
+.seg-sm .seg-opt {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
 /* — small tag — */
 .tag-sm {
     font-size: 10px;

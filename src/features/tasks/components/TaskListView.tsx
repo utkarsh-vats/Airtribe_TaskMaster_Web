@@ -1,7 +1,7 @@
 'use client';
 
 import { clsx } from 'clsx';
-import { Plus } from 'lucide-react';
+import { Columns3, List, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
@@ -21,6 +21,7 @@ import type { TaskListItem, TaskStatus } from '@/lib/api/types';
 import { STATUS_LABELS, TASK_STATUSES } from '@/lib/domain';
 import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { useUrlWith } from '@/lib/hooks/useUrlWith';
+import { isPlainClick } from '@/lib/react/plainClick';
 
 import { useTasks, useTaskStatusCounts, type StatusCounts } from '../api';
 import {
@@ -33,6 +34,7 @@ import {
 import { formatDue } from '../format';
 import { openNewTaskDialog, openTaskPanel } from '../panelHistory';
 import { NewTaskDialog } from './NewTaskDialog';
+import { TaskBoard } from './TaskBoard';
 import { TaskFilterBar } from './TaskFilterBar';
 import { TaskPanel } from './TaskPanel';
 import { TaskSearch } from './TaskSearch';
@@ -42,23 +44,31 @@ const countLabel = (total: number) => (total === 1 ? '1 task' : `${total} tasks`
 
 type StatusOption = 'ALL' | TaskStatus;
 
+type ViewMode = 'list' | 'board';
+/** ?view=board shows the board; the list is the default and isn't written. */
+const viewMode = (params: { get(name: string): string | null }): ViewMode =>
+    params.get('view') === 'board' ? 'board' : 'list';
+
 /**
  * A project's tasks (DESIGN.md §6): status segmented control with counts, search (toolbar
  * below 820px; the header search above), then a table from 820px (prototype density B, no ID
  * column — the API has no task keys) or rows below (density A). Both layouts are rendered and
  * CSS shows one, so there's no layout flash or hydration mismatch. Filters live in the URL
- * (filters.ts); selecting a task sets ?task= (7a), New task sets ?new=1 (7d).
+ * (filters.ts); selecting a task sets ?task= (7a), New task sets ?new=1 (7d). ?view=board swaps
+ * the list for the board (8a), which keeps every filter but status and doesn't page.
  */
 export function TaskListView() {
     const { project } = useProjectContext();
     const searchParams = useSearchParams();
     const urlWith = useUrlWith();
     const filters = parseTaskFilters(searchParams);
-    const tasks = useTasks(project.id, filters); // the list's own query (deduped)
+    const board = viewMode(searchParams) === 'board';
+    // The list's own query (deduped); the board has no pages.
+    const tasks = useTasks(project.id, filters, { enabled: !board });
     // Deleting the only row of a page past the first lands on the previous page.
     const previousPage = filters.page - 1;
     const afterDeleteUrl =
-        previousPage >= 1 && tasks.data?.items.length === 1
+        !board && previousPage >= 1 && tasks.data?.items.length === 1
             ? urlWith({ task: null, page: previousPage > 1 ? String(previousPage) : null })
             : undefined;
 
@@ -82,17 +92,35 @@ function TaskListBody() {
     const searchParams = useSearchParams();
     const urlWith = useUrlWith();
     const filters = parseTaskFilters(searchParams);
-    const tasks = useTasks(project.id, filters);
-    const counts = useTaskStatusCounts(project.id, filters);
+    const view = viewMode(searchParams);
+    const board = view === 'board';
+    // The board makes its own column queries; the list and the status counts sit it out.
+    const tasks = useTasks(project.id, filters, { enabled: !board });
+    const counts = useTaskStatusCounts(project.id, filters, { enabled: !board });
 
-    /** URL for `next` filters, keeping the other params (task, new, view). */
-    const filterUrl = (next: TaskFilters) => {
-        const search = filtersToSearch(next, searchParams);
+    /**
+     * URL for `next` filters, keeping the other params (task, new, view) apart from `params`
+     * changes (null removes one).
+     */
+    const filterUrl = (next: TaskFilters, params: Record<string, string | null> = {}) => {
+        const current = new URLSearchParams(searchParams.toString());
+        for (const [key, value] of Object.entries(params)) {
+            if (value === null) current.delete(key);
+            else current.set(key, value);
+        }
+        const search = filtersToSearch(next, current);
         return search ? `${pathname}?${search}` : pathname;
     };
     // Filters, page and the open task are client state in the URL: no server round trip.
     const applyFilters = (changes: Partial<TaskFilters>) =>
         shallowUrl.push(filterUrl(updateFilters(filters, changes)));
+    // Clears filters and sort, staying in the current view.
+    const clearFilters = () => shallowUrl.push(filterUrl({ page: 1 }));
+    // Switching keeps the filters (status too, though the board ignores it) and drops the page.
+    const switchView = (next: ViewMode) =>
+        shallowUrl.push(
+            filterUrl({ ...filters, page: 1 }, { view: next === 'board' ? next : null }),
+        );
 
     // Typing replaces the history entry instead of adding one per pause.
     const searchKey = searchParams.toString();
@@ -125,31 +153,84 @@ function TaskListBody() {
     const toolbar = (
         <div className="flex flex-col gap-3" data-testid="task-toolbar">
             <div className="flex flex-wrap items-center gap-3">
-                <StatusFilter
-                    status={filters.status}
-                    counts={counts}
-                    onChange={(option) =>
-                        applyFilters({ status: option === 'ALL' ? undefined : [option] })
-                    }
-                />
+                {/* On the board the columns are the statuses. */}
+                {!board && (
+                    <StatusFilter
+                        status={filters.status}
+                        counts={counts}
+                        onChange={(option) =>
+                            applyFilters({ status: option === 'ALL' ? undefined : [option] })
+                        }
+                    />
+                )}
                 <TaskSearch
                     value={filters.q ?? ''}
                     onSearch={onSearch}
                     className="min-w-[160px] flex-1 md:hidden"
                 />
-                <span className="ml-auto">{newTaskButton}</span>
+                <span className="ml-auto flex items-center gap-3">
+                    <Segmented<ViewMode>
+                        aria-label="View"
+                        size="sm"
+                        value={view}
+                        onChange={switchView}
+                        options={[
+                            {
+                                value: 'list',
+                                label: (
+                                    <>
+                                        <List aria-hidden size={14} />
+                                        List
+                                    </>
+                                ),
+                            },
+                            {
+                                value: 'board',
+                                label: (
+                                    <>
+                                        <Columns3 aria-hidden size={14} />
+                                        Board
+                                    </>
+                                ),
+                            },
+                        ]}
+                    />
+                    {newTaskButton}
+                </span>
             </div>
             <TaskFilterBar
                 projectId={project.id}
-                filters={filters}
+                // A status in the URL doesn't narrow the board, so it isn't a filter to clear.
+                filters={board ? { ...filters, status: undefined } : filters}
                 onChange={applyFilters}
-                onClear={() => shallowUrl.push(pathname)}
+                onClear={clearFilters}
             />
-            <span className="text-muted text-sm" aria-live="polite">
-                {tasks.data ? countLabel(tasks.data.meta.total) : ' '}
-            </span>
+            {!board && (
+                <span className="text-muted text-sm" aria-live="polite">
+                    {tasks.data ? countLabel(tasks.data.meta.total) : ' '}
+                </span>
+            )}
         </div>
     );
+
+    if (board) {
+        return (
+            <div className="flex flex-col gap-4">
+                {toolbar}
+                <TaskBoard
+                    projectId={project.id}
+                    filters={filters}
+                    taskHref={taskHref}
+                    onOpen={openTask}
+                    // "See all in the list": that status in the list, other filters kept.
+                    listHref={(status) =>
+                        filterUrl({ ...filters, status: [status], page: 1 }, { view: null })
+                    }
+                    onNavigate={shallowUrl.push}
+                />
+            </div>
+        );
+    }
 
     if (tasks.isPending) {
         return (
@@ -185,7 +266,7 @@ function TaskListBody() {
                         title="No tasks match"
                         body="Clear the search or pick another status."
                         action={
-                            <Button variant="secondary" onClick={() => shallowUrl.push(pathname)}>
+                            <Button variant="secondary" onClick={clearFilters}>
                                 Clear filters
                             </Button>
                         }
@@ -352,14 +433,7 @@ function TaskRows({
                             scroll={false}
                             onClick={(event) => {
                                 // Plain clicks stay in the page; modified clicks (new tab) use the href.
-                                if (
-                                    event.button !== 0 ||
-                                    event.metaKey ||
-                                    event.ctrlKey ||
-                                    event.shiftKey ||
-                                    event.altKey
-                                )
-                                    return;
+                                if (!isPlainClick(event)) return;
                                 event.preventDefault();
                                 onOpen(task.id);
                             }}

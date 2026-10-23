@@ -18,6 +18,8 @@ type SegmentedProps<T extends string> = {
     /** Accessible name of the group. */
     'aria-label': string;
     name?: string;
+    /** 'sm': tighter padding and type, for secondary switches (e.g. List / Board). */
+    size?: 'default' | 'sm';
     className?: string;
 };
 
@@ -30,6 +32,7 @@ export function Segmented<T extends string>({
     value,
     onChange,
     name,
+    size = 'default',
     className,
     'aria-label': ariaLabel,
 }: SegmentedProps<T>) {
@@ -37,7 +40,11 @@ export function Segmented<T extends string>({
     const groupName = name ?? generatedName;
 
     return (
-        <div role="radiogroup" aria-label={ariaLabel} className={clsx('seg', className)}>
+        <div
+            role="radiogroup"
+            aria-label={ariaLabel}
+            className={clsx('seg', size === 'sm' && 'seg-sm', className)}
+        >
             {options.map((option) => (
                 <label key={option.value} className="seg-opt">
                     <input

@@ -153,13 +153,13 @@ afterEach(() => resetRefreshForTests());
 describe('controls write their URL param and reset the page', () => {
     it('priority (Urgent → Low, multi)', async () => {
         mockApi();
-        const u = renderList('page=3&view=board');
+        const u = renderList('page=3&ref=mail');
         await screen.findByText('1 task');
 
         await u.click(within(row()).getByRole('button', { name: 'Any priority' }));
         await u.click(screen.getByRole('checkbox', { name: 'High' }));
 
-        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?priority=HIGH&view=board`);
+        expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?priority=HIGH&ref=mail`);
     });
 
     it('assignee: Anyone, Me, Unassigned, then members by name', async () => {
@@ -290,7 +290,7 @@ describe('order toggle', () => {
 describe('clear and mobile', () => {
     it('Clear filters shows when anything is set and removes every filter and the sort', async () => {
         mockApi();
-        const u = renderList('status=OPEN&q=x&priority=HIGH&sort=title&view=board');
+        const u = renderList('status=OPEN&q=x&priority=HIGH&sort=title');
         await screen.findByText('1 task');
 
         await u.click(within(row()).getByRole('button', { name: 'Clear filters' }));

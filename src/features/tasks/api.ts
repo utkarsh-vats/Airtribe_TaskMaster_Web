@@ -33,8 +33,33 @@ function fetchTasks(projectId: string, query: Record<string, unknown>, signal: A
  * A project's tasks (GET /projects/{id}/tasks) for the given filters, in the API's default
  * order. While another page or filter loads, the previous result stays on screen.
  */
-export function useTasks(projectId: string, filters: TaskFilters, limit = TASKS_PAGE_SIZE) {
-    const query = { ...toQueryParams(filters), page: filters.page, limit };
+export function useTasks(
+    projectId: string,
+    filters: TaskFilters,
+    { enabled = true }: { enabled?: boolean } = {},
+) {
+    const query = { ...toQueryParams(filters), page: filters.page, limit: TASKS_PAGE_SIZE };
+    return useQuery({
+        queryKey: queryKeys.tasks.list(projectId, query),
+        queryFn: ({ signal }) => fetchTasks(projectId, query, signal),
+        placeholderData: keepPreviousData,
+        enabled,
+    });
+}
+
+/** The most a board column loads: the API's page-size cap. */
+export const BOARD_COLUMN_LIMIT = 100;
+
+/**
+ * One board column (DESIGN.md §4): the first 100 tasks with this status, using the other
+ * filters and the sort; any status filter in the URL is ignored. Keyed like any list, so
+ * edits and deletes patch the columns too.
+ */
+export function useBoardColumn(projectId: string, status: TaskStatus, filters: TaskFilters) {
+    const query = {
+        ...toQueryParams({ ...filters, status: [status] }),
+        limit: BOARD_COLUMN_LIMIT,
+    };
     return useQuery({
         queryKey: queryKeys.tasks.list(projectId, query),
         queryFn: ({ signal }) => fetchTasks(projectId, query, signal),
@@ -48,7 +73,11 @@ export type StatusCounts = Record<'ALL' | TaskStatus, number | undefined>;
  * Counts for the status segmented control: four `limit=1` requests with the current filters
  * except status, reading meta.total (DESIGN.md §5). Undefined while loading.
  */
-export function useTaskStatusCounts(projectId: string, filters: TaskFilters): StatusCounts {
+export function useTaskStatusCounts(
+    projectId: string,
+    filters: TaskFilters,
+    { enabled = true }: { enabled?: boolean } = {},
+): StatusCounts {
     // Every filter but status; sort/order don't change a count, so they don't split the cache.
     const {
         sort: _sort,
@@ -68,6 +97,7 @@ export function useTaskStatusCounts(projectId: string, filters: TaskFilters): St
                 queryFn: ({ signal }: { signal: AbortSignal }) =>
                     fetchTasks(projectId, query, signal),
                 select: (page: Awaited<ReturnType<typeof fetchTasks>>) => page.meta.total,
+                enabled,
             };
         }),
     });
