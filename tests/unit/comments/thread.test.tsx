@@ -120,6 +120,23 @@ const apiError = (status: number, code: string, details?: { path: string; messag
 let client: QueryClient;
 
 function renderThread(taskId: string | null = 't1') {
+    // The thread reads the role from the project (comment actions: editDelete.test.tsx).
+    server.use(
+        http.get(`${API_ORIGIN}/api/v1/projects/p1`, () =>
+            HttpResponse.json({
+                data: {
+                    id: 'p1',
+                    name: 'Website relaunch',
+                    description: null,
+                    createdAt: '2026-10-01T09:00:00.000Z',
+                    updatedAt: '2026-10-01T09:00:00.000Z',
+                    myRole: 'MEMBER',
+                    memberCount: 2,
+                    owner: null,
+                } satisfies ProjectDetail,
+            }),
+        ),
+    );
     client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
         <QueryClientProvider client={client}>

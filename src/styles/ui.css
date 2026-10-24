@@ -502,6 +502,18 @@ a.seg-opt:focus-visible {
     }
 }
 
+/* — comment actions: shown on hover / focus from 820px with a mouse; always on touch — */
+@media (min-width: 820px) and (hover: hover) {
+    .tm-comment-actions {
+        opacity: 0;
+    }
+    .tm-comment:hover .tm-comment-actions,
+    .tm-comment:focus-within .tm-comment-actions,
+    .tm-comment-actions[data-state='open'] {
+        opacity: 1;
+    }
+}
+
 /* — filter chip's × — */
 .tm-chip-remove {
     display: inline-grid;

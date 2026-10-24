@@ -1,18 +1,19 @@
 'use client';
 
 import { clsx } from 'clsx';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 
-import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useProject } from '@/features/projects/api';
+import { bindPermissions } from '@/features/projects/permissions';
 import { errorMessage } from '@/lib/api/messages';
-import type { Comment } from '@/lib/api/types';
-import { fullDateTime, relativeTime } from '@/lib/format/dates';
+import { useSession } from '@/lib/auth/SessionProvider';
 
 import { useComments } from '../api';
 import { CommentComposer } from './CommentComposer';
+import { CommentItem } from './CommentItem';
 
 /**
  * A comment thread (DESIGN.md §6) for a task, or the project-level one (`taskId` null): "Comments"
@@ -35,6 +36,13 @@ export function CommentThread({
 }) {
     const thread = useComments(projectId, taskId ?? 'none');
     const headingId = useId();
+    // From the cached project + the signed-in user, like the task panel (works outside
+    // ProjectContext). No actions until both are known.
+    const project = useProject(projectId);
+    const { user } = useSession();
+    const can = project.data && user ? bindPermissions(project.data.myRole, user.id) : null;
+    // One comment in edit mode at a time.
+    const [editingId, setEditingId] = useState<string | null>(null);
     const shown = count ?? thread.data?.pages[0]?.meta.total;
 
     let body;
@@ -69,7 +77,19 @@ export function CommentThread({
             <>
                 <ol aria-labelledby={headingId} className="m-0 flex list-none flex-col gap-3 p-0">
                     {comments.map((comment) => (
-                        <CommentItem key={comment.id} comment={comment} />
+                        <CommentItem
+                            key={comment.id}
+                            projectId={projectId}
+                            comment={comment}
+                            canEdit={can?.editComment(comment) ?? false}
+                            canDelete={can?.deleteComment(comment) ?? false}
+                            editing={editingId === comment.id}
+                            onEditingChange={(editing) =>
+                                setEditingId((current) =>
+                                    editing ? comment.id : current === comment.id ? null : current,
+                                )
+                            }
+                        />
                     ))}
                 </ol>
                 {thread.hasNextPage && (
@@ -104,28 +124,5 @@ export function CommentThread({
             {body}
             <CommentComposer projectId={projectId} taskId={taskId} />
         </section>
-    );
-}
-
-function CommentItem({ comment }: { comment: Comment }) {
-    return (
-        <li className="grid grid-cols-[28px_1fr] gap-3">
-            <Avatar name={comment.author.name} size="sm" />
-            <div className="min-w-0">
-                <div className="text-[13px]">
-                    <b>{comment.author.name}</b>{' '}
-                    <time
-                        className="text-muted"
-                        dateTime={comment.createdAt}
-                        title={fullDateTime(comment.createdAt)}
-                    >
-                        {relativeTime(comment.createdAt)}
-                    </time>
-                    {comment.editedAt && <span className="text-muted"> · edited</span>}
-                </div>
-                {/* Plain text: line breaks kept, never rendered as HTML. */}
-                <p className="m-0 text-sm break-words whitespace-pre-wrap">{comment.body}</p>
-            </div>
-        </li>
     );
 }
