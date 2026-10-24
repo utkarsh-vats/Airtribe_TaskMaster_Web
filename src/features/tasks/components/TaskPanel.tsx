@@ -14,6 +14,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PriorityMark, StatusTag } from '@/components/ui/Tag';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { AttachmentList } from '@/features/attachments/components/AttachmentList';
 import { CommentThread } from '@/features/comments/components/CommentThread';
 import { useProject } from '@/features/projects/api';
 import { bindPermissions } from '@/features/projects/permissions';
@@ -204,14 +205,16 @@ function TaskBody({
                 </section>
             )}
 
-            <PlaceholderSection
-                title="Attachments"
-                count={full ? task.attachmentCount : undefined}
+            <AttachmentList
+                projectId={projectId}
+                taskId={task.id}
+                count={full ? task.attachmentCount : null}
+                className="border-t-rule border-divider pt-3"
             />
             <CommentThread
                 projectId={projectId}
                 taskId={task.id}
-                count={full ? task.commentCount : undefined}
+                count={full ? task.commentCount : null}
                 className="border-t-rule border-divider pt-3"
             />
 
@@ -330,24 +333,6 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
             <dt className="text-[12px] opacity-70">{label}</dt>
             <dd className="m-0 flex min-h-[24px] items-center">{children}</dd>
         </div>
-    );
-}
-
-/** Attachments until step 9c fills it in. */
-function PlaceholderSection({ title, count }: { title: string; count: number | undefined }) {
-    return (
-        <section className="flex flex-col gap-1 border-t-rule border-divider pt-3">
-            <h5 className="m-0">
-                {title}
-                {count !== undefined && (
-                    <>
-                        {/* Its own text node: a space inside the span is dropped from the name. */}{' '}
-                        <span className="text-muted font-normal">({count})</span>
-                    </>
-                )}
-            </h5>
-            <p className="text-muted m-0 text-sm">Coming soon</p>
-        </section>
     );
 }
 

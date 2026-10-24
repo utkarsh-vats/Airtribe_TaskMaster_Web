@@ -20,6 +20,7 @@ import { sessionStore } from '@/lib/auth/store';
 import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { queryKeys } from '@/lib/query/keys';
 
+import { emptyAttachments } from '../../msw/attachments';
 import { emptyComments } from '../../msw/comments';
 import { API_ORIGIN, server } from '../../msw/server';
 
@@ -143,7 +144,7 @@ const panel = () => screen.findByRole('dialog', { name: 'Website relaunch / Task
 
 beforeEach(() => {
     // The panel's comment thread (thread.test.tsx covers it).
-    server.use(emptyComments());
+    server.use(emptyComments(), emptyAttachments());
     sessionStore.reset();
     resetRefreshForTests();
     resetTaskPanelHistoryForTests();
@@ -164,7 +165,7 @@ describe('content', () => {
         renderAt('task=t1');
 
         const dialog = await panel();
-        expect(await within(dialog).findByText('(2)')).toBeInTheDocument(); // detail loaded
+        expect(await within(dialog).findByTestId('attachment-count')).toHaveTextContent('2'); // detail loaded
         expect(within(dialog).getByRole('heading', { level: 3 })).toHaveTextContent(
             'Finalise homepage hero copy',
         );
@@ -182,12 +183,11 @@ describe('content', () => {
         );
         expect(description).toHaveClass('whitespace-pre-wrap');
 
-        expect(
-            within(dialog).getByRole('heading', { name: 'Attachments (2)' }),
-        ).toBeInTheDocument();
+        expect(within(dialog).getByRole('heading', { name: 'Attachments' })).toBeInTheDocument();
+        expect(within(dialog).getByTestId('attachment-count')).toHaveTextContent('2');
         expect(within(dialog).getByRole('heading', { name: 'Comments' })).toBeInTheDocument();
         expect(within(dialog).getByTestId('comment-count')).toHaveTextContent('3');
-        expect(within(dialog).getAllByText('Coming soon')).toHaveLength(1);
+        expect(within(dialog).queryByText('Coming soon')).not.toBeInTheDocument();
         expect(within(dialog).getByText('Created by Priya Raman · 2 h ago')).toBeInTheDocument();
     });
 
@@ -210,10 +210,11 @@ describe('content', () => {
         expect(within(dialog).getByText('In progress')).toBeInTheDocument();
         expect(within(dialog).queryByText('Loading task…')).not.toBeInTheDocument();
         expect(within(dialog).getByRole('heading', { name: 'Attachments' })).toBeInTheDocument();
+        expect(within(dialog).queryByTestId('attachment-count')).not.toBeInTheDocument();
+        expect(within(dialog).queryByTestId('comment-count')).not.toBeInTheDocument();
 
-        expect(
-            await within(dialog).findByRole('heading', { name: 'Attachments (2)' }),
-        ).toBeInTheDocument();
+        expect(await within(dialog).findByTestId('attachment-count')).toHaveTextContent('2');
+        expect(within(dialog).getByTestId('comment-count')).toHaveTextContent('3');
     });
 
     it('shows skeleton lines when there is nothing cached', async () => {
@@ -370,8 +371,6 @@ describe('errors', () => {
         expect(alert).toHaveTextContent("Couldn't load this task");
         await view.user.click(within(alert).getByRole('button', { name: /Try again/ }));
 
-        expect(
-            await within(dialog).findByRole('heading', { name: 'Attachments (2)' }),
-        ).toBeInTheDocument();
+        expect(await within(dialog).findByTestId('attachment-count')).toHaveTextContent('2');
     });
 });

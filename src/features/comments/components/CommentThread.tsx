@@ -30,8 +30,11 @@ export function CommentThread({
     projectId: string;
     taskId: string | null;
     title?: string;
-    /** The count to show (the task's commentCount); the thread's total when omitted. */
-    count?: number;
+    /**
+     * The count to show: the task's commentCount (null while it isn't known yet, e.g. the panel is
+     * still showing the list row), or the thread's own total when omitted.
+     */
+    count?: number | null;
     className?: string;
 }) {
     const thread = useComments(projectId, taskId ?? 'none');
@@ -43,7 +46,7 @@ export function CommentThread({
     const can = project.data && user ? bindPermissions(project.data.myRole, user.id) : null;
     // One comment in edit mode at a time.
     const [editingId, setEditingId] = useState<string | null>(null);
-    const shown = count ?? thread.data?.pages[0]?.meta.total;
+    const shown = count === undefined ? thread.data?.pages[0]?.meta.total : count;
 
     let body;
     if (thread.isPending) {
@@ -115,7 +118,7 @@ export function CommentThread({
                 <h5 id={headingId} className="m-0">
                     {title}
                 </h5>
-                {shown !== undefined && (
+                {shown != null && (
                     <span className="text-muted text-[12px]" data-testid="comment-count">
                         {shown}
                     </span>

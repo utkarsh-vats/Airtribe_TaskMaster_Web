@@ -31,6 +31,7 @@ import { sessionStore } from '@/lib/auth/store';
 import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { queryKeys } from '@/lib/query/keys';
 
+import { emptyAttachments } from '../../msw/attachments';
 import { API_ORIGIN, server } from '../../msw/server';
 
 const nav = vi.hoisted(() => ({ search: '' }));
@@ -433,6 +434,7 @@ describe('deleting', () => {
             }),
             // The server's count stays stale: the panel's count is the cache's.
             http.get(`${tasksUrl}/t1`, () => HttpResponse.json({ data: detail })),
+            emptyAttachments(),
         );
         nav.search = 'task=t1';
         client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

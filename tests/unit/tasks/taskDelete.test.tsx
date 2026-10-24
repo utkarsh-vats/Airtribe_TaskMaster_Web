@@ -27,6 +27,7 @@ import { sessionStore } from '@/lib/auth/store';
 import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { queryKeys } from '@/lib/query/keys';
 
+import { emptyAttachments } from '../../msw/attachments';
 import { emptyComments } from '../../msw/comments';
 import { API_ORIGIN, server } from '../../msw/server';
 
@@ -159,7 +160,7 @@ async function openPanel({
         </QueryClientProvider>,
     );
     const panel = await screen.findByRole('dialog', { name: 'Website relaunch / Task' });
-    await within(panel).findByRole('heading', { name: 'Attachments (0)' }); // the full task
+    await within(panel).findByTestId('attachment-count'); // shown once the full task is in
     return { panel, user: userEvent.setup() };
 }
 
@@ -175,7 +176,7 @@ let historyBack: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
     // The panel's comment thread (thread.test.tsx covers it).
-    server.use(emptyComments());
+    server.use(emptyComments(), emptyAttachments());
     url.search = 'task=t1';
     resetRefreshForTests();
     resetTaskPanelHistoryForTests();
