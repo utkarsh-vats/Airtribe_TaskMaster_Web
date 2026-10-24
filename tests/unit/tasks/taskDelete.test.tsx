@@ -27,6 +27,7 @@ import { sessionStore } from '@/lib/auth/store';
 import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { queryKeys } from '@/lib/query/keys';
 
+import { emptyComments } from '../../msw/comments';
 import { API_ORIGIN, server } from '../../msw/server';
 
 const PATH = '/dashboard/projects/p1/tasks';
@@ -158,7 +159,7 @@ async function openPanel({
         </QueryClientProvider>,
     );
     const panel = await screen.findByRole('dialog', { name: 'Website relaunch / Task' });
-    await within(panel).findByRole('heading', { name: 'Comments (0)' }); // the full task
+    await within(panel).findByRole('heading', { name: 'Attachments (0)' }); // the full task
     return { panel, user: userEvent.setup() };
 }
 
@@ -173,6 +174,8 @@ let urlReplace: ReturnType<typeof vi.spyOn>;
 let historyBack: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
+    // The panel's comment thread (thread.test.tsx covers it).
+    server.use(emptyComments());
     url.search = 'task=t1';
     resetRefreshForTests();
     resetTaskPanelHistoryForTests();

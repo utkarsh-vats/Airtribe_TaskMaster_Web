@@ -20,6 +20,7 @@ import { sessionStore } from '@/lib/auth/store';
 import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { queryKeys } from '@/lib/query/keys';
 
+import { emptyComments } from '../../msw/comments';
 import { API_ORIGIN, server } from '../../msw/server';
 
 const PATH = '/dashboard/projects/p1/tasks';
@@ -141,6 +142,8 @@ function renderAt(search: string) {
 const panel = () => screen.findByRole('dialog', { name: 'Website relaunch / Task' });
 
 beforeEach(() => {
+    // The panel's comment thread (thread.test.tsx covers it).
+    server.use(emptyComments());
     sessionStore.reset();
     resetRefreshForTests();
     resetTaskPanelHistoryForTests();
@@ -182,8 +185,9 @@ describe('content', () => {
         expect(
             within(dialog).getByRole('heading', { name: 'Attachments (2)' }),
         ).toBeInTheDocument();
-        expect(within(dialog).getByRole('heading', { name: 'Comments (3)' })).toBeInTheDocument();
-        expect(within(dialog).getAllByText('Coming soon')).toHaveLength(2);
+        expect(within(dialog).getByRole('heading', { name: 'Comments' })).toBeInTheDocument();
+        expect(within(dialog).getByTestId('comment-count')).toHaveTextContent('3');
+        expect(within(dialog).getAllByText('Coming soon')).toHaveLength(1);
         expect(within(dialog).getByText('Created by Priya Raman · 2 h ago')).toBeInTheDocument();
     });
 
@@ -367,7 +371,7 @@ describe('errors', () => {
         await view.user.click(within(alert).getByRole('button', { name: /Try again/ }));
 
         expect(
-            await within(dialog).findByRole('heading', { name: 'Comments (3)' }),
+            await within(dialog).findByRole('heading', { name: 'Attachments (2)' }),
         ).toBeInTheDocument();
     });
 });

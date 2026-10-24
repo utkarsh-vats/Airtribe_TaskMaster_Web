@@ -24,6 +24,7 @@ import { sessionStore } from '@/lib/auth/store';
 import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { queryKeys } from '@/lib/query/keys';
 
+import { emptyComments } from '../../msw/comments';
 import { API_ORIGIN, server } from '../../msw/server';
 
 vi.mock('next/navigation', () => ({
@@ -178,7 +179,7 @@ async function openPanel({
         </QueryClientProvider>,
     );
     const dialog = await screen.findByRole('dialog', { name: 'Website relaunch / Task' });
-    await within(dialog).findByRole('heading', { name: 'Comments (0)' }); // the full task
+    await within(dialog).findByRole('heading', { name: 'Attachments (0)' }); // the full task
     return { dialog, user: userEvent.setup() };
 }
 
@@ -189,6 +190,8 @@ const tableRow = () =>
     });
 
 beforeEach(() => {
+    // The panel's comment thread (thread.test.tsx covers it).
+    server.use(emptyComments());
     resetRefreshForTests();
     resetTaskPanelHistoryForTests();
     serverTask = baseTask();

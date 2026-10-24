@@ -14,6 +14,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PriorityMark, StatusTag } from '@/components/ui/Tag';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { CommentThread } from '@/features/comments/components/CommentThread';
 import { useProject } from '@/features/projects/api';
 import { bindPermissions } from '@/features/projects/permissions';
 import { isApiError } from '@/lib/api/errors';
@@ -207,7 +208,12 @@ function TaskBody({
                 title="Attachments"
                 count={full ? task.attachmentCount : undefined}
             />
-            <PlaceholderSection title="Comments" count={full ? task.commentCount : undefined} />
+            <CommentThread
+                projectId={projectId}
+                taskId={task.id}
+                count={full ? task.commentCount : undefined}
+                className="border-t-rule border-divider pt-3"
+            />
 
             <footer className="flex flex-col gap-1 border-t-rule border-divider pt-3">
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
@@ -327,7 +333,7 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
     );
 }
 
-/** Attachments / Comments until steps 9a and 9c fill them in. */
+/** Attachments until step 9c fills it in. */
 function PlaceholderSection({ title, count }: { title: string; count: number | undefined }) {
     return (
         <section className="flex flex-col gap-1 border-t-rule border-divider pt-3">
