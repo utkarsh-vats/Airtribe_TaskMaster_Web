@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
     countBarFilters,
@@ -10,6 +10,8 @@ import {
     toQueryParams,
     updateFilters,
 } from '@/features/tasks/filters';
+
+import { restoreTimeZoneAfterEach } from '../../timeZone';
 
 const parse = (search: string) => parseTaskFilters(new URLSearchParams(search));
 
@@ -189,10 +191,7 @@ describe('advanced filters (6c)', () => {
 });
 
 describe('due range → API instants (user time zone)', () => {
-    const originalTz = process.env.TZ;
-    afterEach(() => {
-        process.env.TZ = originalTz;
-    });
+    restoreTimeZoneAfterEach();
 
     it('Asia/Kolkata: dueAfter = start of from − 1 ms, dueBefore = start of the day after to', () => {
         process.env.TZ = 'Asia/Kolkata';

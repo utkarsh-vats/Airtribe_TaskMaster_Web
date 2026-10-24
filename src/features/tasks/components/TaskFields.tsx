@@ -86,7 +86,10 @@ export function TitleField({ projectId, task }: FieldProps) {
             return;
         }
         setDraft(title);
-        await save({ patch: { title } });
+        // A rejected save rolls the cache back, and the draft with it. Done here rather than by
+        // following task.title: if the optimistic title and the rollback land before a render,
+        // this field never sees the title change and would keep the rejected text.
+        if (!(await save({ patch: { title } }))) setDraft(task.title);
     };
 
     return (

@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
 import { PRIORITY_LABELS } from '@/lib/domain';
-import { shortDate } from '@/lib/format/dates';
+import { formatDay } from '@/lib/format/dates';
 
 import type { TaskFilters } from '../filters';
 
@@ -15,9 +15,6 @@ export type FilterChip = {
     /** The change that removes just this filter. */
     clear: Partial<TaskFilters>;
 };
-
-/** A YYYY-MM-DD day as "Oct 20" (local midnight, so the day doesn't shift). */
-const day = (value: string) => shortDate(`${value}T00:00:00`);
 
 /** A user filter's value as shown: Me, Unassigned, or the person's name. */
 const person = (value: string, nameOf: (id: string) => string) =>
@@ -54,10 +51,10 @@ export function filterChips(filters: TaskFilters, nameOf: (id: string) => string
         const { dueFrom, dueTo } = filters;
         const range =
             dueFrom && dueTo
-                ? `${day(dueFrom)} – ${day(dueTo)}`
+                ? `${formatDay(dueFrom)} – ${formatDay(dueTo)}`
                 : dueFrom
-                  ? `from ${day(dueFrom)}`
-                  : `until ${day(dueTo ?? '')}`;
+                  ? `from ${formatDay(dueFrom)}`
+                  : `until ${formatDay(dueTo ?? '')}`;
         chips.push({
             key: 'due',
             label: `Due: ${range}`,

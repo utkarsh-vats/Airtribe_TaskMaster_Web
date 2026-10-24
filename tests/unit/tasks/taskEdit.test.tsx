@@ -2,13 +2,13 @@
  * Editing in the task panel. The panel is modal, so the list behind it is outside the
  * accessibility tree: list-row assertions use `hidden: true`.
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { notifyManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { toast } from 'sonner';
 import type * as Sonner from 'sonner';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '@/components/ui/Tooltip';
 import { bindPermissions } from '@/features/projects/permissions';
@@ -26,6 +26,7 @@ import { queryKeys } from '@/lib/query/keys';
 
 import { emptyComments } from '../../msw/comments';
 import { API_ORIGIN, server } from '../../msw/server';
+import { inTimeZone } from '../../timeZone';
 
 vi.mock('next/navigation', () => ({
     usePathname: () => '/dashboard/projects/p1/tasks',
@@ -37,13 +38,7 @@ vi.mock('sonner', async (importOriginal) => {
     return { ...original, toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) };
 });
 
-const originalTz = process.env.TZ;
-beforeAll(() => {
-    process.env.TZ = 'Asia/Kolkata';
-});
-afterAll(() => {
-    process.env.TZ = originalTz;
-});
+inTimeZone('Asia/Kolkata');
 
 const ME = '6c1d1b8e-2f4a-4c3b-8d9e-0a1b2c3d4e5f';
 const PRIYA = '0b6f9f3a-5d2e-4c1b-9a8e-1f2d3c4b5a69';
@@ -368,6 +363,40 @@ describe('optimistic updates', () => {
         ).toBeInTheDocument();
         expect(title).toHaveValue('Finalise homepage hero copy'); // rolled back
         expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('422 rolls the title back even if the optimistic title never rendered', async () => {
+        // A fast 422 can arrive before React renders the optimistic title (TanStack batches
+        // cache notifications on a timer); the field must not keep the rejected text.
+        patchFailure = () =>
+            HttpResponse.json(
+                {
+                    error: {
+                        code: 'VALIDATION_ERROR',
+                        message: 'Request validation failed',
+                        details: [{ path: 'title', message: 'Title is already used' }],
+                        requestId: 'r',
+                    },
+                },
+                { status: 422 },
+            );
+        const { dialog, user } = await openPanel();
+        const title = within(dialog).getByRole('textbox', { name: 'Title' });
+        await user.clear(title);
+        await user.type(title, 'Duplicate');
+
+        // Hold cache notifications until after the response, so the optimistic value and
+        // the rollback reach the component together.
+        notifyManager.setScheduler((flush) => setTimeout(flush, 100));
+        try {
+            await user.keyboard('{Enter}');
+            expect(await within(dialog).findByText('Title is already used')).toBeInTheDocument();
+            await vi.waitFor(() => expect(title).toHaveValue('Finalise homepage hero copy'), {
+                timeout: 2000,
+            });
+        } finally {
+            notifyManager.setScheduler((flush) => setTimeout(flush, 0));
+        }
     });
 
     it('lists and status counts (and My tasks) are invalidated after it settles', async () => {

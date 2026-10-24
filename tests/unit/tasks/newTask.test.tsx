@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { toast } from 'sonner';
 import type * as Sonner from 'sonner';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '@/components/ui/Tooltip';
 import { bindPermissions } from '@/features/projects/permissions';
@@ -18,6 +18,7 @@ import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { queryKeys } from '@/lib/query/keys';
 
 import { API_ORIGIN, server } from '../../msw/server';
+import { inTimeZone } from '../../timeZone';
 
 const PATH = '/dashboard/projects/p1/tasks';
 const url = vi.hoisted(() => ({ search: 'new=1' }));
@@ -32,13 +33,7 @@ vi.mock('sonner', async (importOriginal) => {
     return { ...original, toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) };
 });
 
-const originalTz = process.env.TZ;
-beforeAll(() => {
-    process.env.TZ = 'Asia/Kolkata';
-});
-afterAll(() => {
-    process.env.TZ = originalTz;
-});
+inTimeZone('Asia/Kolkata');
 
 const PRIYA = '0b6f9f3a-5d2e-4c1b-9a8e-1f2d3c4b5a69';
 const MARA = '6c1d1b8e-2f4a-4c3b-8d9e-0a1b2c3d4e5f';

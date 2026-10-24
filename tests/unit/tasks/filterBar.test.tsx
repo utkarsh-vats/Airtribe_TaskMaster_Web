@@ -8,17 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import {
-    afterAll,
-    afterEach,
-    beforeAll,
-    beforeEach,
-    describe,
-    expect,
-    it,
-    vi,
-    type MockInstance,
-} from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { bindPermissions } from '@/features/projects/permissions';
 import { ProjectContext } from '@/features/projects/ProjectContext';
@@ -30,6 +20,7 @@ import { sessionStore } from '@/lib/auth/store';
 import { shallowUrl } from '@/lib/hooks/shallowUrl';
 
 import { API_ORIGIN, server } from '../../msw/server';
+import { inTimeZone } from '../../timeZone';
 
 const PATH = '/dashboard/projects/p1/tasks';
 const nav = vi.hoisted(() => ({ search: '', push: vi.fn(), replace: vi.fn() }));
@@ -40,13 +31,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 // Due dates convert in the user's time zone: pin it.
-const originalTz = process.env.TZ;
-beforeAll(() => {
-    process.env.TZ = 'Asia/Kolkata';
-});
-afterAll(() => {
-    process.env.TZ = originalTz;
-});
+inTimeZone('Asia/Kolkata');
 
 const PRIYA = '0b6f9f3a-5d2e-4c1b-9a8e-1f2d3c4b5a69';
 const MARA = '6c1d1b8e-2f4a-4c3b-8d9e-0a1b2c3d4e5f';

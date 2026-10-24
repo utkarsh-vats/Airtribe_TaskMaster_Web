@@ -13,7 +13,36 @@ const otherYearFormat = new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
 });
 
-/** "Oct 18", or "Oct 18, 2025" when it isn't the current year. */
+// Date-only values ("2026-10-20") are calendar days, not instants: built and formatted in UTC
+// so the day never shifts with the viewer's time zone.
+const dayFormat = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+});
+const otherYearDayFormat = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+});
+const isoDay = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A date-only `YYYY-MM-DD` (e.g. a dueFrom / dueTo filter) as "Oct 20", or "Oct 20, 2025"
+ * outside the current year; "" for anything else. The same day in every time zone — never
+ * `new Date("2026-10-20")`, which is UTC midnight and shows as Oct 19 west of UTC.
+ */
+export function formatDay(day: string, now: Date = new Date()): string {
+    const match = isoDay.exec(day);
+    if (!match) return '';
+    const [, y, m, d] = match.map(Number) as [number, number, number, number];
+    const date = new Date(Date.UTC(y, m - 1, d));
+    if (date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return '';
+    return (y === now.getFullYear() ? dayFormat : otherYearDayFormat).format(date);
+}
+
+/** "Oct 18", or "Oct 18, 2025" when it isn't the current year. For instants (ISO date-times). */
 export function shortDate(iso: string, now: Date = new Date()): string {
     const date = new Date(iso);
     return (date.getFullYear() === now.getFullYear() ? sameYearFormat : otherYearFormat).format(

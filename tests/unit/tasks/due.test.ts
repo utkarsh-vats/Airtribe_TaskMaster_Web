@@ -1,11 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { fromDueInstant, toDueInstant } from '@/features/tasks/due';
 
-const originalTz = process.env.TZ;
-afterEach(() => {
-    process.env.TZ = originalTz;
-});
+import { restoreTimeZoneAfterEach } from '../../timeZone';
+
+restoreTimeZoneAfterEach();
 
 describe('toDueInstant', () => {
     it('Asia/Kolkata: end of the day with +05:30', () => {

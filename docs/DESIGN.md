@@ -110,7 +110,7 @@ The prototype was built on demo data. Where it differs from the API, the API win
 | Priority `HIGH / MEDIUM / LOW` | API adds `URGENT`: label "Urgent", priority mark in `--tm-danger`, bold label. Order Urgent → Low |
 | Task key `TM-101` | Not shown (no sequential ids). The panel breadcrumb is `Project / Task` |
 | Status select in "New task" | API creates every task as `OPEN`. The modal has no status field; "Add task" at the bottom of a board column (ghost button, Plus icon) opens it with `?new=1&column=<status>`, then the task is created and PATCHed to that status |
-| Due date is a date input | Sent as end of that day in the user's timezone, ISO 8601 with offset (`2026-10-28T23:59:59+05:30`); displayed as a date |
+| Due date is a date input | Sent as end of that day in the user's timezone, ISO 8601 with offset (`2026-10-28T23:59:59+05:30`); displayed as a date. Date-only values (the `dueFrom` / `dueTo` filters, YYYY-MM-DD) are calendar days, shown with `formatDay()` (`src/lib/format/dates.ts`), which never shifts the day with the time zone |
 | Status filter with counts | Counts come from 4 `limit=1` list queries reading `meta.total`, cached with the list |
 | Header "Search tasks" | Searches the current project (`q` on the task list); on `/dashboard/my-tasks` it searches my tasks |
 | Sidebar project count | API gives `memberCount`, not open-task count; the sidebar shows the role tag instead of a number |
@@ -236,7 +236,7 @@ UI checks only hide or disable controls; the API stays the authority. `myRole` c
 
 ## 10. Testing
 
-- **Unit / component (Vitest + Testing Library + MSW):** UI kit behaviour, form validation, error mapping, the refresh single-flight (two concurrent 401s → one refresh), notification sentence builder, due-date conversion, permission helpers, filter ↔ URL round-trips.
+- **Unit / component (Vitest + Testing Library + MSW):** UI kit behaviour, form validation, error mapping, the refresh single-flight (two concurrent 401s → one refresh), notification sentence builder, due-date conversion, permission helpers, filter ↔ URL round-trips. The suite runs in `TZ=UTC` by default (`vitest.config.mts`; a `TZ` set in the shell wins, so it can be run in other zones); tests that need a zone use `tests/timeZone.ts`, which restores the previous value, and `tests/setup.ts` resets it after every file as a safety net.
 - **E2E (Playwright, against a locally running API):** register → create project → create task → move it on the board → comment → upload/download a file; invite → accept as a second user; notification appears live; log out.
 - **CI (GitHub Actions):** lint, format check, typecheck, unit tests, `next build`. E2E runs locally (it needs the API).
 - **Manual checks per step:** 375 px width, both themes, keyboard-only navigation of the step's screens.

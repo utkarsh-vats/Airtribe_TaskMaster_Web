@@ -23,6 +23,10 @@ export default defineConfig({
         env: {
             NEXT_PUBLIC_API_URL: 'http://localhost:3000',
             API_URL: 'http://localhost:3000',
+            // One default zone for the whole suite, locally and in CI (where TZ is unset). A TZ set
+            // in the shell wins, to run the suite in another zone (TZ=America/New_York npm test);
+            // tests that need a zone override it on top (tests/timeZone.ts) and restore it.
+            TZ: process.env.TZ || 'UTC',
         },
     },
 });

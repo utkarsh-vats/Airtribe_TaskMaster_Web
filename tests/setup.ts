@@ -3,12 +3,18 @@ import '@testing-library/jest-dom/vitest';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 
 import { server } from './msw/server';
+import { restoreTimeZone } from './timeZone';
 
 // Any request without a matching handler fails the test instead of hitting the network.
 // (MSW 3 renamed v2's `onUnhandledRequest` to `onUnhandledFrame`.)
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
+
+// Safety net: whatever a file did to TZ, the next file in this worker starts from the suite's
+// zone (vitest.config.mts). Overrides should restore it themselves (tests/timeZone.ts).
+const suiteTimeZone = process.env.TZ;
+afterAll(() => restoreTimeZone(suiteTimeZone));
 
 // Everything below needs a DOM. Server-side tests (route handlers) opt into the node
 // environment with `// @vitest-environment node` and skip it.
