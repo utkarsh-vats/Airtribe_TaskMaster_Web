@@ -216,8 +216,17 @@ export function toQueryParams(filters: Partial<TaskFilters>) {
 }
 
 /**
+ * ?column=<status>: the board column the New task dialog adds to (8c). Not a filter — it's
+ * kept as it is by filtersToSearch and removed together with ?new. Absent or junk → OPEN.
+ */
+export function parseNewTaskColumn(params: { get(name: string): string | null }): TaskStatus {
+    const column = params.get('column');
+    return TASK_STATUSES.find((status) => status === column) ?? 'OPEN';
+}
+
+/**
  * URL search string for `filters`: filter params in FILTER_PARAMS order (equal filters give
- * equal URLs; page 1 omitted), then every other param (task, new, view, …) as it was.
+ * equal URLs; page 1 omitted), then every other param (task, new, column, view, …) as it was.
  */
 export function filtersToSearch(
     filters: TaskFilters,

@@ -475,6 +475,49 @@ a.seg-opt:focus-visible {
 .tm-nav-link:focus-visible {
     outline-offset: -2px;
 }
+/* — collapsible filter row: rows 0fr ↔ 1fr, so the height animates to fit its content — */
+.tm-collapse {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    /* Closed, it takes no room: cancel the parent's gap (--tm-collapse-gap). */
+    margin: calc(-1 * var(--tm-collapse-gap, 0px)) -4px 0;
+}
+.tm-collapse[data-state='open'] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    /* The content's 4px padding keeps focus rings inside the clip; this cancels it. */
+    margin: -4px;
+}
+.tm-collapse > * {
+    min-height: 0;
+    overflow: hidden;
+}
+@media (prefers-reduced-motion: no-preference) {
+    .tm-collapse[data-animated] {
+        transition:
+            grid-template-rows 200ms ease,
+            opacity 200ms ease,
+            margin 200ms ease;
+    }
+}
+
+/* — filter chip's × — */
+.tm-chip-remove {
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+}
+.tm-chip-remove:hover {
+    background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
 .tm-count-badge {
     display: inline-grid;
     place-items: center;

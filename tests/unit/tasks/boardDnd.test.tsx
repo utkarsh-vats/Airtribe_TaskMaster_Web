@@ -136,6 +136,7 @@ function renderBoard(role: ProjectRole = 'OWNER') {
                     filters={{ page: 1 }}
                     taskHref={(id) => `/dashboard/projects/p1/tasks?view=board&task=${id}`}
                     onOpen={onOpen}
+                    onAddTask={vi.fn()}
                     listHref={() => '/list'}
                     onNavigate={vi.fn()}
                 />

@@ -4,7 +4,7 @@ import { clsx } from 'clsx';
 import { Columns3, List, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useId } from 'react';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Button, ButtonLink } from '@/components/ui/Button';
@@ -24,23 +24,31 @@ import { useUrlWith } from '@/lib/hooks/useUrlWith';
 import { isPlainClick } from '@/lib/react/plainClick';
 
 import { useTasks, useTaskStatusCounts, type StatusCounts } from '../api';
+import { useFilterBarOpen } from '../filterBarOpen';
 import {
+    countBarFilters,
     filtersToSearch,
     hasActiveFilters,
+    parseNewTaskColumn,
     parseTaskFilters,
     updateFilters,
     type TaskFilters,
 } from '../filters';
 import { formatDue } from '../format';
 import { openNewTaskDialog, openTaskPanel } from '../panelHistory';
+import { FiltersToggle } from './FilterToggle';
 import { NewTaskDialog } from './NewTaskDialog';
 import { TaskBoard } from './TaskBoard';
 import { TaskFilterBar } from './TaskFilterBar';
 import { TaskPanel } from './TaskPanel';
 import { TaskSearch } from './TaskSearch';
+import { TaskSortControls } from './TaskSortControls';
 
 const firstLine = (text: string | null) => text?.split('\n').find((line) => line.trim()) ?? '';
 const countLabel = (total: number) => (total === 1 ? '1 task' : `${total} tasks`);
+/** What the live region announces when the list's result changes. */
+const resultAnnouncement = (total: number, filtered: boolean) =>
+    total === 0 && filtered ? 'No tasks match' : countLabel(total);
 
 type StatusOption = 'ALL' | TaskStatus;
 
@@ -81,7 +89,11 @@ export function TaskListView() {
                 taskId={searchParams.get('task')}
                 afterDeleteUrl={afterDeleteUrl}
             />
-            <NewTaskDialog projectId={project.id} open={searchParams.get('new') === '1'} />
+            <NewTaskDialog
+                projectId={project.id}
+                open={searchParams.get('new') === '1'}
+                column={parseNewTaskColumn(searchParams)}
+            />
         </>
     );
 }
@@ -97,6 +109,8 @@ function TaskListBody() {
     // The board makes its own column queries; the list and the status counts sit it out.
     const tasks = useTasks(project.id, filters, { enabled: !board });
     const counts = useTaskStatusCounts(project.id, filters, { enabled: !board });
+    const [filtersOpen, setFiltersOpen, filtersAnimated] = useFilterBarOpen();
+    const filterRowId = useId();
 
     /**
      * URL for `next` filters, keeping the other params (task, new, view) apart from `params`
@@ -135,16 +149,17 @@ function TaskListBody() {
     );
 
     // The task panel (?task) and the New task dialog (?new) never open together.
-    const taskHref = (taskId: string) => urlWith({ task: taskId, new: null });
+    const taskHref = (taskId: string) => urlWith({ task: taskId, new: null, column: null });
     // Pushes a history entry, so Back closes the panel (panelHistory.ts).
     const openTask = (taskId: string) => openTaskPanel(taskHref(taskId), taskId);
+    // New task into a status (?column=, omitted for To do). Pushes, so Back closes the dialog.
+    const openNewTask = (column: TaskStatus = 'OPEN') =>
+        openNewTaskDialog(
+            urlWith({ new: '1', task: null, column: column === 'OPEN' ? null : column }),
+        );
 
     const newTaskButton = (
-        <Button
-            variant="primary"
-            // Pushes an entry, so Back closes the dialog (panelHistory.ts).
-            onClick={() => openNewTaskDialog(urlWith({ new: '1', task: null }))}
-        >
+        <Button variant="primary" onClick={() => openNewTask()}>
             <Plus aria-hidden size={14} />
             New task
         </Button>
@@ -167,6 +182,19 @@ function TaskListBody() {
                     value={filters.q ?? ''}
                     onSearch={onSearch}
                     className="min-w-[160px] flex-1 md:hidden"
+                />
+                {/* From 820px; below, the Filters sheet holds the filters and the sort. */}
+                <FiltersToggle
+                    open={filtersOpen}
+                    onToggle={() => setFiltersOpen(!filtersOpen)}
+                    active={countBarFilters(filters)}
+                    controls={filterRowId}
+                    className="hidden md:inline-flex"
+                />
+                <TaskSortControls
+                    filters={filters}
+                    onChange={applyFilters}
+                    className="hidden md:flex"
                 />
                 <span className="ml-auto flex items-center gap-3">
                     <Segmented<ViewMode>
@@ -199,15 +227,21 @@ function TaskListBody() {
                 </span>
             </div>
             <TaskFilterBar
+                id={filterRowId}
+                open={filtersOpen}
+                animated={filtersAnimated}
                 projectId={project.id}
                 // A status in the URL doesn't narrow the board, so it isn't a filter to clear.
                 filters={board ? { ...filters, status: undefined } : filters}
                 onChange={applyFilters}
                 onClear={clearFilters}
             />
+            {/* The status counts show the numbers; this announces a changed result. */}
             {!board && (
-                <span className="text-muted text-sm" aria-live="polite">
-                    {tasks.data ? countLabel(tasks.data.meta.total) : ' '}
+                <span className="sr-only" aria-live="polite" data-testid="result-announcement">
+                    {tasks.data
+                        ? resultAnnouncement(tasks.data.meta.total, hasActiveFilters(filters))
+                        : ''}
                 </span>
             )}
         </div>
@@ -222,6 +256,7 @@ function TaskListBody() {
                     filters={filters}
                     taskHref={taskHref}
                     onOpen={openTask}
+                    onAddTask={openNewTask}
                     // "See all in the list": that status in the list, other filters kept.
                     listHref={(status) =>
                         filterUrl({ ...filters, status: [status], page: 1 }, { view: null })

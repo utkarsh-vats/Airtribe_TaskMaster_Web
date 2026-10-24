@@ -17,9 +17,11 @@ import {
     type DragStartEvent,
 } from '@dnd-kit/core';
 import { clsx } from 'clsx';
+import { Plus } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 
 import { Avatar } from '@/components/ui/Avatar';
+import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PriorityMark } from '@/components/ui/Tag';
@@ -50,6 +52,8 @@ type TaskBoardProps = {
     taskHref: (taskId: string) => string;
     /** Open a task's panel in place. */
     onOpen: (taskId: string) => void;
+    /** Open the New task dialog for a column. */
+    onAddTask: (status: TaskStatus) => void;
     /** URL of the list filtered to one status, for a column that holds more than 100. */
     listHref: (status: TaskStatus) => string;
     /** Go to a URL in place (list state is client-side; no route round trip). */
@@ -176,6 +180,7 @@ function BoardColumn({
     filters,
     taskHref,
     onOpen,
+    onAddTask,
     listHref,
     onNavigate,
     canDrag,
@@ -282,6 +287,15 @@ function BoardColumn({
                 <span className="text-muted text-[12px]">{total ?? '–'}</span>
             </div>
             {body}
+            <Button
+                variant="ghost"
+                className="justify-start"
+                aria-label={`Add task to ${label}`}
+                onClick={() => onAddTask(status)}
+            >
+                <Plus aria-hidden size={14} />
+                Add task
+            </Button>
         </section>
     );
 }

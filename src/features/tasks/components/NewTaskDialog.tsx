@@ -17,15 +17,18 @@ import { useProjectMembers } from '@/features/members/api';
 import { ERROR_CODES, hasCode } from '@/lib/api/errors';
 import { applyFieldErrors } from '@/lib/api/forms';
 import { errorMessage } from '@/lib/api/messages';
-import { PRIORITY_LABELS, TASK_PRIORITIES } from '@/lib/domain';
+import type { TaskStatus } from '@/lib/api/types';
+import { PRIORITY_LABELS, STATUS_LABELS, TASK_PRIORITIES } from '@/lib/domain';
 import { useUrlWith } from '@/lib/hooks/useUrlWith';
 import { mergeRefs } from '@/lib/react/mergeRefs';
 
-import { useCreateTask, type CreateTaskInput } from '../api';
+import { useCreateTask, useUpdateTask, type CreateTaskInput } from '../api';
 import { closeNewTaskDialog, openTaskPanel } from '../panelHistory';
 import { newTaskSchema, type NewTaskFormInput, type NewTaskFormValues } from '../schemas';
 
 export const TASK_CREATED_MESSAGE = 'Task created';
+export const taskNotMovedMessage = (column: TaskStatus) =>
+    `Task created in To do — couldn't move it to ${STATUS_LABELS[column]}`;
 
 const FIELDS = ['title', 'description', 'priority', 'assignee', 'due'] as const;
 /** Request fields → form fields, for a 422's details. */
@@ -35,17 +38,26 @@ type NewTaskFormHandle = { isDirty: () => boolean };
 
 /**
  * "New task" (DESIGN.md §6), open while ?new=1 is in the URL. Closing with a title or
- * description typed asks before discarding them; closing removes ?new without leaving an
- * extra history entry (panelHistory.ts).
+ * description typed asks before discarding them; closing removes ?new (and ?column) without
+ * leaving an extra history entry (panelHistory.ts). A board column's Add task sets `column`:
+ * the API creates every task as To do, so another column is a PATCH after the POST (§5).
  */
-export function NewTaskDialog({ projectId, open }: { projectId: string; open: boolean }) {
+export function NewTaskDialog({
+    projectId,
+    open,
+    column = 'OPEN',
+}: {
+    projectId: string;
+    open: boolean;
+    column?: TaskStatus;
+}) {
     const urlWith = useUrlWith();
     const [form, setForm] = useState<NewTaskFormHandle | null>(null);
     const [confirmDiscard, setConfirmDiscard] = useState(false);
 
     const close = () => {
         setConfirmDiscard(false);
-        closeNewTaskDialog(urlWith({ new: null }));
+        closeNewTaskDialog(urlWith({ new: null, column: null }));
     };
     // Cancel, Esc, the overlay and X all come here.
     const requestClose = () => {
@@ -61,12 +73,18 @@ export function NewTaskDialog({ projectId, open }: { projectId: string; open: bo
                     if (!next) requestClose();
                 }}
                 title="New task"
+                description={
+                    column === 'OPEN' ? undefined : (
+                        <span className="text-muted">Will be added to {STATUS_LABELS[column]}</span>
+                    )
+                }
                 width={580}
             >
                 {/* Its own component so the form resets every time the dialog opens. */}
                 <NewTaskForm
                     ref={setForm}
                     projectId={projectId}
+                    column={column}
                     onCancel={requestClose}
                     onCreated={close}
                 />
@@ -88,16 +106,19 @@ export function NewTaskDialog({ projectId, open }: { projectId: string; open: bo
 function NewTaskForm({
     ref,
     projectId,
+    column,
     onCancel,
     onCreated,
 }: {
     ref: Ref<NewTaskFormHandle>;
     projectId: string;
+    column: TaskStatus;
     onCancel: () => void;
     onCreated: () => void;
 }) {
     const urlWith = useUrlWith();
     const createTask = useCreateTask(projectId);
+    const updateTask = useUpdateTask(projectId);
     const members = useProjectMembers(projectId);
     const { message: formError, show: showFormError, ref: formErrorRef } = useFormAlert();
     const [leaving, setLeaving] = useState(false);
@@ -108,7 +129,7 @@ function NewTaskForm({
         getValues,
         setValue,
         control,
-        formState: { errors },
+        formState: { errors, isSubmitting },
     } = useForm<NewTaskFormInput, unknown, NewTaskFormValues>({
         resolver: zodResolver(newTaskSchema),
         defaultValues: { title: '', description: '', priority: 'MEDIUM', assignee: '', due: '' },
@@ -152,16 +173,9 @@ function NewTaskForm({
             ...(values.assignee ? { assigneeId: values.assignee } : {}),
             ...(values.due ? { dueDate: values.due } : {}),
         };
+        let task;
         try {
-            const task = await createTask.mutateAsync(body);
-            setLeaving(true);
-            onCreated();
-            toast.success(TASK_CREATED_MESSAGE, {
-                action: {
-                    label: 'Open',
-                    onClick: () => openTaskPanel(urlWith({ task: task.id, new: null }), task.id),
-                },
-            });
+            task = await createTask.mutateAsync(body);
         } catch (error) {
             if (hasCode(error, ERROR_CODES.VALIDATION_ERROR)) {
                 const unplaced = applyFieldErrors(error, setError, FIELD_MAP, FIELDS);
@@ -169,10 +183,32 @@ function NewTaskForm({
                 return;
             }
             showFormError(errorMessage(error));
+            return;
         }
+        const { id } = task;
+        const open = {
+            label: 'Open',
+            onClick: () => openTaskPanel(urlWith({ task: id, new: null, column: null }), id),
+        };
+        // Created as To do; move it to the column it was added from. The task exists either way,
+        // so a failed move still closes the dialog (the columns refetch on settle).
+        let moved = true;
+        if (column !== 'OPEN') {
+            moved = await updateTask
+                .mutateAsync({ taskId: id, patch: { status: column }, silent: true })
+                .then(
+                    () => true,
+                    () => false,
+                );
+        }
+        setLeaving(true);
+        onCreated();
+        if (moved) toast.success(TASK_CREATED_MESSAGE, { action: open });
+        else toast.error(taskNotMovedMessage(column), { action: open });
     });
 
-    const pending = createTask.isPending || leaving;
+    // Through the POST and, for another column, the PATCH after it.
+    const pending = isSubmitting || leaving;
 
     return (
         <form noValidate onSubmit={onSubmit} className="flex flex-col gap-3">

@@ -1,6 +1,8 @@
 /*
  * The filter bar renders as a row from 820px and inside a sheet below; jsdom ignores the CSS,
- * so tests use the row (data-testid="filter-row") unless they're about the mobile sheet.
+ * so tests use the row (data-testid="filter-row") unless they're about the mobile sheet. The
+ * row starts open here (remembered in storage); filterToggle.test.tsx covers collapsing it.
+ * Sort lives in the toolbar.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, within } from '@testing-library/react';
@@ -21,6 +23,7 @@ import {
 import { bindPermissions } from '@/features/projects/permissions';
 import { ProjectContext } from '@/features/projects/ProjectContext';
 import { TaskListView } from '@/features/tasks/components/TaskListView';
+import { FILTER_BAR_OPEN_KEY, resetFilterBarOpenForTests } from '@/features/tasks/filterBarOpen';
 import type { Member, ProjectDetail, TaskListItem, User } from '@/lib/api/types';
 import { resetRefreshForTests, startSession } from '@/lib/auth/refresh';
 import { sessionStore } from '@/lib/auth/store';
@@ -140,6 +143,8 @@ const countRequests = (requests: string[]) => requests.filter((r) => r.includes(
 let urlPush: MockInstance<(url: string) => void>;
 
 beforeEach(() => {
+    resetFilterBarOpenForTests();
+    localStorage.setItem(FILTER_BAR_OPEN_KEY, 'true');
     urlPush = vi.spyOn(shallowUrl, 'push').mockImplementation(() => {});
     vi.spyOn(shallowUrl, 'replace').mockImplementation(() => {});
     sessionStore.reset();
@@ -226,7 +231,7 @@ describe('controls write their URL param and reset the page', () => {
         const u = renderList('order=asc&page=2');
         await screen.findByText('1 task');
 
-        await u.selectOptions(within(row()).getByRole('combobox', { name: 'Sort by' }), 'priority');
+        await u.selectOptions(screen.getByRole('combobox', { name: 'Sort by' }), 'priority');
         expect(urlPush).toHaveBeenLastCalledWith(`${PATH}?sort=priority`);
     });
 });
@@ -281,7 +286,7 @@ describe('order toggle', () => {
         const u = renderList(search);
         await screen.findByText('1 task');
 
-        const toggle = within(row()).getByRole('button', { name: label });
+        const toggle = screen.getByRole('button', { name: label });
         await u.click(toggle);
         expect(urlPush).toHaveBeenLastCalledWith(next);
     });
@@ -314,11 +319,13 @@ describe('clear and mobile', () => {
         );
         await screen.findByText('1 task');
 
-        const button = screen.getByRole('button', { name: 'Filters, 3 active' });
+        const button = screen.getByTestId('filter-sheet-button');
+        expect(button).toHaveAccessibleName('Filters, 3 active');
         expect(within(button).getByTestId('filter-badge')).toHaveTextContent('3');
 
         await u.click(button);
         const sheet = await screen.findByRole('dialog', { name: 'Filters' });
+        expect(within(sheet).getByRole('combobox', { name: 'Sort by' })).toHaveValue('title');
         await u.click(within(sheet).getByRole('checkbox', { name: 'Overdue only' }));
         expect(urlPush).toHaveBeenLastCalledWith(
             `${PATH}?status=OPEN&priority=HIGH&assignee=me&dueFrom=2026-10-01&dueTo=2026-10-09&overdue=true&sort=title`,
@@ -330,7 +337,7 @@ describe('clear and mobile', () => {
         renderList('status=OPEN&q=x');
         await screen.findByText('1 task');
 
-        expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
+        expect(screen.getByTestId('filter-sheet-button')).toHaveAccessibleName('Filters');
         expect(screen.queryByTestId('filter-badge')).not.toBeInTheDocument();
     });
 });

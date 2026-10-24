@@ -1,7 +1,7 @@
 'use client';
 
-import { ArrowDown, ArrowUp, SlidersHorizontal } from 'lucide-react';
-import { useId, useState } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
+import { useId, useState, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
@@ -12,26 +12,12 @@ import { useProjectMembers } from '@/features/members/api';
 import type { TaskPriority } from '@/lib/api/types';
 import { PRIORITY_LABELS, TASK_PRIORITIES } from '@/lib/domain';
 
-import {
-    countBarFilters,
-    DEFAULT_ORDER,
-    DEFAULT_SORT,
-    effectiveOrder,
-    hasAnyListParams,
-    TASK_SORTS,
-    type TaskFilters,
-    type TaskSort,
-} from '../filters';
+import { countBarFilters, hasAnyListParams, type TaskFilters } from '../filters';
+import { ActiveFilterChips } from './ActiveFilterChips';
+import { FiltersCollapse } from './FilterToggle';
+import { TaskSortControls } from './TaskSortControls';
 
 const PRIORITY_OPTIONS = TASK_PRIORITIES.map((value) => ({ value, label: PRIORITY_LABELS[value] }));
-
-const SORT_LABELS: Record<TaskSort, string> = {
-    createdAt: 'Created',
-    updatedAt: 'Updated',
-    dueDate: 'Due date',
-    priority: 'Priority',
-    title: 'Title',
-};
 
 type FilterBarProps = {
     projectId: string;
@@ -42,23 +28,62 @@ type FilterBarProps = {
 };
 
 /**
- * Advanced filters and sort (DESIGN.md §5): a wrapping row from 820px; below that a "Filters"
- * button (badge = active filters) opening a sheet with the same controls, applied as they change.
+ * Advanced filters (DESIGN.md §5). From 820px a row that the toolbar's FiltersToggle opens and
+ * closes (`open`, `id`); while it's closed, active filters show as removable chips. Sort lives
+ * in the toolbar there (TaskSortControls). Below 820px a "Filters" button (badge = active
+ * filters) opens a sheet with the same controls plus sort, applied as they change.
  */
-export function TaskFilterBar(props: FilterBarProps) {
+export function TaskFilterBar({
+    open,
+    animated,
+    id,
+    ...props
+}: FilterBarProps & {
+    /** Whether the wide-screen row is open. */
+    open: boolean;
+    /** False until the user toggles (no slide-in on load). */
+    animated: boolean;
+    /** The row's id, for the toggle's aria-controls. */
+    id: string;
+}) {
     const [sheetOpen, setSheetOpen] = useState(false);
+    const members = useProjectMembers(props.projectId);
     const active = countBarFilters(props.filters);
+
+    const nameOf = (userId: string) => {
+        if (!members.data) return '…';
+        const member = members.data.find((m) => m.user.id === userId);
+        return member?.user.name ?? 'Former member';
+    };
 
     return (
         <>
-            <div className="hidden flex-wrap items-end gap-3 md:flex" data-testid="filter-row">
-                <FilterControls {...props} />
-            </div>
+            <FiltersCollapse
+                id={id}
+                open={open}
+                animated={animated}
+                gap="var(--space-3)"
+                className="hidden md:grid"
+            >
+                <div className="flex flex-wrap items-end gap-3" data-testid="filter-row">
+                    <FilterControls {...props} />
+                </div>
+            </FiltersCollapse>
+            {!open && (
+                <ActiveFilterChips
+                    filters={props.filters}
+                    nameOf={nameOf}
+                    onChange={props.onChange}
+                    className="hidden md:flex"
+                />
+            )}
 
             <div className="md:hidden">
                 <Button
                     variant="secondary"
+                    aria-haspopup="dialog"
                     aria-label={active ? `Filters, ${active} active` : 'Filters'}
+                    data-testid="filter-sheet-button"
                     onClick={() => setSheetOpen(true)}
                 >
                     <SlidersHorizontal aria-hidden size={14} />
@@ -75,7 +100,18 @@ export function TaskFilterBar(props: FilterBarProps) {
                 </Button>
                 <Sheet open={sheetOpen} onOpenChange={setSheetOpen} title="Filters">
                     <div className="flex flex-col gap-4">
-                        <FilterControls {...props} stacked />
+                        <FilterControls
+                            {...props}
+                            stacked
+                            sort={
+                                <TaskSortControls
+                                    filters={props.filters}
+                                    onChange={props.onChange}
+                                    stacked
+                                    className="flex w-full"
+                                />
+                            }
+                        />
                         {/* Wide button: label flush left (design system). */}
                         <Button variant="primary" block onClick={() => setSheetOpen(false)}>
                             Done
@@ -93,13 +129,12 @@ function FilterControls({
     onChange,
     onClear,
     stacked = false,
-}: FilterBarProps & { stacked?: boolean }) {
+    sort,
+}: FilterBarProps & { stacked?: boolean; sort?: ReactNode }) {
     const members = useProjectMembers(projectId);
     const overdueId = useId();
     const sorted = [...(members.data ?? [])].sort((a, b) => a.user.name.localeCompare(b.user.name));
     const knownIds = new Set(sorted.map((member) => member.user.id));
-    const order = effectiveOrder(filters);
-    const sort = filters.sort ?? DEFAULT_SORT;
     const width = stacked ? 'w-full' : '';
 
     /** A user id in the URL that isn't (or is no longer) a member still needs an option. */
@@ -191,48 +226,7 @@ function FilterControls({
                 Overdue only
             </label>
 
-            <div className={`flex items-end gap-1 ${stacked ? 'w-full' : ''}`}>
-                <Field label="Sort by" className={stacked ? 'flex-1' : 'w-[140px]'}>
-                    <NativeSelect
-                        value={sort}
-                        onChange={(event) => {
-                            const next = event.target.value as TaskSort;
-                            // A new field starts in its own natural direction.
-                            onChange({
-                                sort: next === DEFAULT_SORT ? undefined : next,
-                                order: undefined,
-                            });
-                        }}
-                    >
-                        {TASK_SORTS.map((value) => (
-                            <option key={value} value={value}>
-                                {SORT_LABELS[value]}
-                            </option>
-                        ))}
-                    </NativeSelect>
-                </Field>
-                <Button
-                    variant="secondary"
-                    iconOnly
-                    aria-label={order === 'asc' ? 'Sort ascending' : 'Sort descending'}
-                    title={
-                        order === 'asc'
-                            ? 'Ascending — switch to descending'
-                            : 'Descending — switch to ascending'
-                    }
-                    onClick={() => {
-                        const flipped = order === 'asc' ? 'desc' : 'asc';
-                        // Back to the field's default direction → drop `order` from the URL.
-                        onChange({ order: flipped === DEFAULT_ORDER[sort] ? undefined : flipped });
-                    }}
-                >
-                    {order === 'asc' ? (
-                        <ArrowUp aria-hidden size={16} />
-                    ) : (
-                        <ArrowDown aria-hidden size={16} />
-                    )}
-                </Button>
-            </div>
+            {sort}
 
             {hasAnyListParams(filters) && (
                 <Button

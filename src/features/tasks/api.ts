@@ -175,6 +175,8 @@ export type TaskUpdate = {
     taskId?: string;
     /** A status change dropped on the board: also move the card between the cached columns. */
     columns?: ColumnMove;
+    /** The caller reports a failure itself (no error toast); rollback still happens. */
+    silent?: boolean;
 };
 
 export const TASK_STATUS_CONFLICT_MESSAGE = "Someone else changed this task's status — refreshed.";
@@ -290,6 +292,7 @@ export function useUpdateTask(projectId: string, boundTaskId?: string) {
                 if (context.columns) restoreColumnCaches(queryClient, context.columns);
                 restore(taskId, context.previous);
             }
+            if (update.silent) return;
             if (isApiError(error) && error.status === 409) {
                 toast(TASK_STATUS_CONFLICT_MESSAGE);
                 // The project's columns, lists and this detail all refetch on settle.

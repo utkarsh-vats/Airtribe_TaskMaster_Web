@@ -13,6 +13,7 @@ import { TooltipProvider } from '@/components/ui/Tooltip';
 import { bindPermissions } from '@/features/projects/permissions';
 import { ProjectContext } from '@/features/projects/ProjectContext';
 import { TaskListView } from '@/features/tasks/components/TaskListView';
+import { FILTER_BAR_OPEN_KEY, resetFilterBarOpenForTests } from '@/features/tasks/filterBarOpen';
 import { resetTaskPanelHistoryForTests } from '@/features/tasks/panelHistory';
 import type { ProjectDetail, Task, TaskListItem, TaskStatus, User } from '@/lib/api/types';
 import { resetRefreshForTests, startSession } from '@/lib/auth/refresh';
@@ -147,6 +148,7 @@ const boardRequests = (requests: string[]) => requests.filter((r) => r.includes(
 let urlPush: MockInstance<(url: string) => void>;
 
 beforeEach(() => {
+    resetFilterBarOpenForTests();
     urlPush = vi.spyOn(shallowUrl, 'push').mockImplementation(() => {});
     vi.spyOn(shallowUrl, 'replace').mockImplementation(() => {});
     sessionStore.reset();
@@ -361,6 +363,7 @@ describe('board toolbar', () => {
     it('hides the status segmented control, the task count and pagination', async () => {
         const hundred = Array.from({ length: 100 }, (_, i) => task(`o${i}`));
         mockBoard({ OPEN: { items: hundred, total: 250 } });
+        localStorage.setItem(FILTER_BAR_OPEN_KEY, 'true');
         renderView('status=OPEN&view=board');
 
         await within(column('To do')).findByText('Showing 100 of 250');
@@ -377,6 +380,7 @@ describe('board toolbar', () => {
     });
 
     it('Clear filters keeps the board', async () => {
+        localStorage.setItem(FILTER_BAR_OPEN_KEY, 'true');
         mockBoard();
         const u = renderView('priority=HIGH&view=board');
 
