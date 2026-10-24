@@ -18,8 +18,9 @@ import {
  * return the session with the current user.
  *
  * The cookie is cleared when the session is over — no cookie, or the API rejects the token
- * (4xx). When the API is down or failing (0 / 5xx) the cookie is kept, so a blip doesn't sign
- * the user out; the client retries later.
+ * (4xx). When the API is down, failing or rate limiting (0 / 5xx / 429) the cookie is kept, so
+ * a blip doesn't sign the user out; a 429 passes through with its Retry-After and RateLimit
+ * headers, and the client retries later.
  */
 export async function POST(request: NextRequest) {
     const foreign = rejectForeignOrigin(request);
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
     return response;
 }
 
-/** A 4xx means the token or session is unusable; 0 / 5xx means try again later. */
+/** A 4xx means the token or session is unusable; 0 / 5xx / 429 means try again later. */
 function isSessionEnded(status: number) {
-    return status >= 400 && status < 500;
+    return status >= 400 && status < 500 && status !== 429;
 }

@@ -22,6 +22,12 @@ type ApiClientOptions = {
     onTokenExpired?: (staleToken: string | null) => Promise<string | null>;
     /** Called when a 401 can't be recovered: the session is over. */
     onUnauthorized?: () => void;
+    /**
+     * After onTokenExpired gave no token: whether that ended the session (the refresh was
+     * rejected). If not (rate limited, API down), the request just fails and the user stays
+     * signed in. Omit to treat every failed refresh as the end of the session.
+     */
+    isSessionOver?: () => boolean;
 };
 
 const isAbort = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
@@ -35,6 +41,7 @@ export function createApiClient({
     getAccessToken,
     onTokenExpired,
     onUnauthorized,
+    isSessionOver,
 }: ApiClientOptions) {
     const client = createClient<paths>({
         baseUrl: removeTrailingSlash(baseUrl),
@@ -83,9 +90,13 @@ export function createApiClient({
                     if (retried.status === 401) onUnauthorized?.();
                     return retried;
                 }
+                // No token: over if the refresh was rejected; a 429 or an outage isn't the end
+                // of the session, so this request just fails with its 401.
+                if (!isSessionOver || isSessionOver()) onUnauthorized?.();
+                return undefined;
             }
 
-            // Any other 401, or no token to retry with: the session is over.
+            // Any other 401: the session is over.
             onUnauthorized?.();
             return undefined;
         },
@@ -124,6 +135,8 @@ export const api = createApiClient({
         return refreshSession();
     },
     onUnauthorized: sessionEnded,
+    // refresh.ts ends the session only when the refresh is rejected (401 / 4xx, not 429).
+    isSessionOver: () => sessionStore.get().status === 'unauthenticated',
 });
 
 // ── result helpers ─────────────────────────────────────────────────────────────────────

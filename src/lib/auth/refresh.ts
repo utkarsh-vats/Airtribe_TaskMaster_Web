@@ -16,13 +16,36 @@ const LOCK_NAME = 'tm-refresh';
 const REFRESH_LEAD_MS = 60_000;
 /** After a failed proactive refresh (API down), try again this much later. */
 const RETRY_AFTER_FAILURE_MS = 30_000;
+/** A 429 without a usable Retry-After waits this long. */
+const DEFAULT_RATE_LIMIT_WAIT_MS = 30_000;
 
 let inFlight: Promise<string | null> | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
+/** When the last refresh was rate limited: the time (ms since epoch) it may be retried. */
+let rateLimitedUntil: number | null = null;
+
+/**
+ * If the last refresh got a 429, when it may be retried (ms since epoch); otherwise null.
+ * SessionProvider uses it to count down and retry a session restore.
+ */
+export const refreshRetryAt = () => rateLimitedUntil;
+
+/** Retry-After in seconds or as an HTTP date; anything else → the default wait. */
+export function retryAfterMs(header: string | null, now = Date.now()): number {
+    const value = header?.trim();
+    if (value) {
+        if (/^\d+$/.test(value)) return Number(value) * 1000;
+        const date = Date.parse(value);
+        if (!Number.isNaN(date)) return Math.max(0, date - now);
+    }
+    return DEFAULT_RATE_LIMIT_WAIT_MS;
+}
 
 /**
  * Get a fresh access token from the refresh cookie. Resolves to the new token, or null:
  *   - 401 / 4xx (session over) → store becomes unauthenticated;
+ *   - 429 (rate limited) → store unchanged; a signed-in user's refresh is retried after
+ *     Retry-After (default 30 s), and refreshRetryAt() tells a restore when to retry;
  *   - 5xx / network (try later) → store unchanged — a user with a valid token stays signed
  *     in, and a session being restored stays 'unknown' (SessionProvider offers a retry).
  */
@@ -39,6 +62,7 @@ async function withRefreshLock<T>(task: () => Promise<T>): Promise<T> {
 }
 
 async function requestRefresh(): Promise<string | null> {
+    rateLimitedUntil = null;
     let response: Response;
     try {
         response = await postAuth('refresh');
@@ -54,6 +78,13 @@ async function requestRefresh(): Promise<string | null> {
             return payload.accessToken;
         }
         return keepSessionForNow();
+    }
+    if (response.status === 429) {
+        // Temporary: never a reason to sign out.
+        const wait = retryAfterMs(response.headers.get('retry-after'));
+        rateLimitedUntil = Date.now() + wait;
+        if (sessionStore.get().status === 'authenticated') schedule(wait);
+        return null;
     }
     if (response.status >= 400 && response.status < 500) {
         endSession();
@@ -122,5 +153,6 @@ export function cancelScheduledRefresh() {
 /** Tests only: forget any in-flight refresh and the scheduled one. */
 export function resetRefreshForTests() {
     inFlight = null;
+    rateLimitedUntil = null;
     cancelScheduledRefresh();
 }

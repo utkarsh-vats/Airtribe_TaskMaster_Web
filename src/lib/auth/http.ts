@@ -14,7 +14,15 @@ import { setRefreshCookie } from './cookies';
 const NO_STORE = { 'cache-control': 'no-store' };
 
 /** Rate-limit headers worth passing back to the browser on a forwarded error. */
-const FORWARDED_HEADERS = ['retry-after', 'ratelimit', 'ratelimit-policy'];
+const FORWARDED_HEADERS = [
+    'retry-after',
+    // IETF draft-7 combined headers, and draft-6's separate ones.
+    'ratelimit',
+    'ratelimit-policy',
+    'ratelimit-limit',
+    'ratelimit-remaining',
+    'ratelimit-reset',
+];
 
 export function json(status: number, body: unknown): NextResponse {
     return NextResponse.json(body, { status, headers: NO_STORE });

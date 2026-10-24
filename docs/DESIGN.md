@@ -53,11 +53,11 @@ Browser ──(Bearer accessToken)───────────────�
 
 - **Route handlers** (`app/api/auth/*`): `login`, `register`, `refresh`, `logout`, `logout-all`. They call the API server-side, put the refresh token in an `httpOnly; Secure (prod); SameSite=Lax; Path=/` cookie `tm_refresh` with the refresh TTL as `Max-Age`, and return only `{ accessToken, expiresIn, user }`.
 - **Access token** lives in memory only (a module-level store, `src/lib/auth/store.ts`, read with `useSyncExternalStore`). Lost on reload → restored by `SessionProvider` calling `/api/auth/refresh` (the cookie rides along). `SessionProvider` is mounted in the dashboard layout only, so visiting `/`, `/login` or `/register` never rotates the refresh token.
-- **Refresh outcomes:** 401 / 4xx → signed out. 5xx / network → nothing changes: a signed-in user stays signed in (and the proactive refresh retries in 30 s); a session being restored shows "Can't reach TaskMaster" with *Try again* instead of redirecting to `/login` (which would loop once the guard sends signed-in users back). The proactive refresh runs 60 s before `expiresAt` (or halfway for tokens shorter than 2 min).
+- **Refresh outcomes:** only an auth failure ends a session — 401 or another 4xx (e.g. 400) from the refresh → signed out, and the route clears the cookie. A 429 or 5xx never does: the route keeps the cookie (a 429 passes through with its `Retry-After` / `RateLimit-*` headers). 5xx / network → nothing changes: a signed-in user stays signed in (and the proactive refresh retries in 30 s); a session being restored shows "Can't reach TaskMaster" with *Try again* instead of redirecting to `/login` (which would loop once the guard sends signed-in users back). 429 → a signed-in user keeps their in-memory token and the refresh retries after `Retry-After` (default 30 s); a session being restored shows the same screen with "Too many requests — retrying in {n} s", counts down and retries by itself (*Try again* still works). The proactive refresh runs 60 s before `expiresAt` (or halfway for tokens shorter than 2 min).
 - **Single-flight refresh.** The backend treats a reused refresh token as theft and revokes every session. So:
   - within a tab, concurrent 401s share one refresh promise;
   - across tabs, the refresh call runs inside `navigator.locks.request('tm-refresh', …)`; the next tab to get the lock sends the already-rotated cookie.
-- **401 handling:** `TOKEN_EXPIRED` → refresh once and retry the request once (from a clone taken before sending, so POST/PATCH bodies survive; a retry is never retried). If another request already refreshed while this one was in flight, the retry reuses that token instead of refreshing again. Any other 401, or a failed refresh → clear the session and the query cache and go to `/login?next=<path>` (a full page load). `/api/auth/*` calls never go through this.
+- **401 handling:** `TOKEN_EXPIRED` → refresh once and retry the request once (from a clone taken before sending, so POST/PATCH bodies survive; a retry is never retried). If another request already refreshed while this one was in flight, the retry reuses that token instead of refreshing again. Any other 401, or a rejected refresh → clear the session and the query cache and go to `/login?next=<path>` (a full page load). If the refresh was rate limited or the API is down, the request fails with its 401 and the user stays signed in. `/api/auth/*` calls never go through this.
 - **Route guard:** `src/proxy.ts` (Next 16 renamed middleware to proxy), matcher `/dashboard/:path*`, `/login`, `/register` only — never `/`, `/api`, `_next` or static files. It only checks that the `tm_refresh` cookie is present and non-empty; the API is the real authority.
   - `/dashboard/**` without the cookie → 307 `/login?next=<path + query>`.
   - `/login` and `/register` with the cookie → 307 `safeNext(?next)`.
@@ -71,7 +71,7 @@ Browser ──(Bearer accessToken)───────────────�
 - **Cross-tab sync:** `BroadcastChannel('tm-auth')` (no-op where unsupported), messages `{ type, tabId }`; a tab ignores its own. `signed-out` → other tabs on `/dashboard/**` drop their session and cache and go to `/login`; `signed-in` (after `signIn` / `register`) → other tabs on `/login` or `/register` go to `safeNext(their next)`. Tabs on other pages (e.g. `/`) aren't moved.
 - **Change password** revokes all refresh tokens on the API, so the UI signs out and sends the user to log in again with a toast explaining why.
 
-**Backend settings this needs:** `CORS_ORIGIN=http://localhost:3001` (the web app's dev URL). For production behind one proxy, the route handlers must forward the client IP (`X-Forwarded-For`) and the backend needs `app.set('trust proxy', 1)`; otherwise every login shares one rate-limit bucket. Recorded as a follow-up, not part of these steps.
+**Backend settings this needs:** `CORS_ORIGIN=http://localhost:3001` (the web app's dev URL). For production behind one proxy, the route handlers must forward the client IP (`X-Forwarded-For`) and the backend needs `app.set('trust proxy', 1)`; otherwise every login shares one rate-limit bucket. Recorded as a follow-up (§13), not part of these steps.
 
 ---
 
@@ -349,3 +349,12 @@ Steps 3–14 are split into small, separately reviewed sub-steps:
 - **14e** Optional: home-lab deploy behind cloudflared.
 
 **Cut line if time runs short:** keyboard drag (8b), upload progress bars (9d), then Docker / deploy (14d's Dockerfile, 14e). Optional: replace the coming-soon landing page with a real marketing page. Never cut auth correctness (4a–4e) or error handling.
+
+---
+
+## 13. Backend follow-ups
+
+Changes the API should make; the web app works around them for now.
+
+- Give `/auth/refresh` its own, higher rate limit — it's token-gated, so the login limit isn't needed. (Today a few quick reloads can hit the shared limit; the app treats that 429 as temporary and retries, §3.)
+- Behind a proxy: `app.set('trust proxy', 1)` and read the client IP from `X-Forwarded-For`, so logins don't share one rate-limit bucket (§3).

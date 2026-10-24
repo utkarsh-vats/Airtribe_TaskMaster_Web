@@ -284,6 +284,40 @@ describe('POST /api/auth/refresh', () => {
         expect(refreshCookie(response)).toMatch(/^tm_refresh=;.*Max-Age=0/);
     });
 
+    it('keeps the cookie on a 429 and passes Retry-After and RateLimit headers through', async () => {
+        server.use(
+            http.post(api('/auth/refresh'), () =>
+                HttpResponse.json(
+                    {
+                        error: {
+                            code: 'RATE_LIMITED',
+                            message: 'Too many requests',
+                            requestId: 'r',
+                        },
+                    },
+                    {
+                        status: 429,
+                        headers: {
+                            'Retry-After': '42',
+                            'RateLimit-Limit': '10',
+                            'RateLimit-Remaining': '0',
+                            'RateLimit-Reset': '42',
+                        },
+                    },
+                ),
+            ),
+        );
+
+        const response = await refresh(request('refresh', { cookie: REFRESH_TOKEN }));
+
+        expect(response.status).toBe(429);
+        expect(await bodyOf(response)).toMatchObject({ error: { code: 'RATE_LIMITED' } });
+        expect(response.headers.get('retry-after')).toBe('42');
+        expect(response.headers.get('ratelimit-remaining')).toBe('0');
+        expect(response.headers.get('ratelimit-reset')).toBe('42');
+        expect(refreshCookie(response)).toBeUndefined();
+    });
+
     it('keeps the cookie when the API is down, so a blip does not sign the user out', async () => {
         server.use(http.post(api('/auth/refresh'), () => HttpResponse.error()));
 

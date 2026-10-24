@@ -7,7 +7,13 @@ import { ApiError, ERROR_CODES } from '@/lib/api/errors';
 import type { User } from '@/lib/api/types';
 import { register, signIn } from '@/lib/auth/actions';
 import { authNavigation, loginUrl } from '@/lib/auth/navigation';
-import { refreshSession, resetRefreshForTests, startSession } from '@/lib/auth/refresh';
+import {
+    refreshRetryAt,
+    refreshSession,
+    resetRefreshForTests,
+    retryAfterMs,
+    startSession,
+} from '@/lib/auth/refresh';
 import { resetSessionEndedForTests } from '@/lib/auth/sessionEnded';
 import { SessionProvider } from '@/lib/auth/SessionProvider';
 import { sessionStore } from '@/lib/auth/store';
@@ -38,6 +44,11 @@ const session = (accessToken: string, expiresIn = 900) => ({
 });
 const apiError = (status: number, code: string) =>
     HttpResponse.json({ error: { code, message: code, requestId: 'r' } }, { status });
+const rateLimited = (retryAfter: string) =>
+    HttpResponse.json(
+        { error: { code: ERROR_CODES.RATE_LIMITED, message: 'Too many requests', requestId: 'r' } },
+        { status: 429, headers: { 'Retry-After': retryAfter } },
+    );
 
 /** /api/auth/refresh answering with `respond`; returns the call counter. */
 function mockRefresh(respond: () => Response) {
@@ -141,6 +152,20 @@ describe('refresh-and-retry', () => {
         expect(loginUrl(PATH)).toBe('/login?next=%2Fdashboard%2Fmy-tasks%3Fview%3Dboard');
     });
 
+    it('a rate-limited refresh fails the request but keeps the session', async () => {
+        startSession(session('old').data);
+        mockMe('never');
+        mockRefresh(() => rateLimited('30'));
+        getQueryClient().setQueryData(['projects'], ['cached']);
+
+        const error = await unwrap(api.GET('/api/v1/users/me')).catch((e: unknown) => e);
+
+        expect(error).toMatchObject({ status: 401, code: ERROR_CODES.TOKEN_EXPIRED });
+        expect(sessionStore.get()).toMatchObject({ status: 'authenticated', accessToken: 'old' });
+        expect(getQueryClient().getQueryData(['projects'])).toEqual(['cached']);
+        expect(toLogin).not.toHaveBeenCalled();
+    });
+
     it('signs out on a 401 that is not TOKEN_EXPIRED, without refreshing', async () => {
         startSession(session('old').data);
         const refresh = mockRefresh(() => HttpResponse.json(session('new')));
@@ -162,6 +187,44 @@ describe('refreshSession', () => {
         expect(await refreshSession()).toBeNull();
 
         expect(sessionStore.get()).toMatchObject({ status: 'authenticated', accessToken: 'old' });
+    });
+
+    it('signs a signed-in user out when the refresh is rejected with 401', async () => {
+        startSession(session('old').data);
+        mockRefresh(() => apiError(401, ERROR_CODES.INVALID_REFRESH_TOKEN));
+
+        expect(await refreshSession()).toBeNull();
+
+        expect(sessionStore.get().status).toBe('unauthenticated');
+    });
+
+    it('keeps a signed-in user on a 429 and retries after Retry-After', async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+        // fetch is stubbed rather than served by MSW (see the proactive refresh test below).
+        const fetchSpy = vi
+            .spyOn(globalThis, 'fetch')
+            .mockImplementationOnce(async () => rateLimited('5'))
+            .mockImplementation(async () => Response.json(session('new')));
+        startSession(session('old').data);
+
+        expect(await refreshSession()).toBeNull();
+        expect(sessionStore.get()).toMatchObject({ status: 'authenticated', accessToken: 'old' });
+        expect(refreshRetryAt()).toBe(Date.now() + 5000);
+
+        vi.advanceTimersByTime(4999);
+        expect(fetchSpy).toHaveBeenCalledOnce();
+        vi.advanceTimersByTime(1);
+        await vi.waitFor(() => expect(sessionStore.get().accessToken).toBe('new'));
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        expect(refreshRetryAt()).toBeNull();
+    });
+
+    it('reads Retry-After as seconds or an HTTP date, else waits 30 s', () => {
+        const now = Date.parse('2026-10-24T10:00:00Z');
+        expect(retryAfterMs('12', now)).toBe(12_000);
+        expect(retryAfterMs('Sat, 24 Oct 2026 10:00:20 GMT', now)).toBe(20_000);
+        expect(retryAfterMs(null, now)).toBe(30_000);
+        expect(retryAfterMs('soon', now)).toBe(30_000);
     });
 
     it('leaves a session being restored as unknown on a network failure', async () => {
@@ -241,6 +304,31 @@ describe('SessionProvider', () => {
 
         expect(await screen.findByText("Can't reach TaskMaster")).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Try again/ })).toBeInTheDocument();
+        expect(router.replace).not.toHaveBeenCalled();
+    });
+
+    it('on a 429 counts down, then restores the session by itself', async () => {
+        let calls = 0;
+        const refresh = mockRefresh(() => {
+            calls += 1;
+            return calls === 1 ? rateLimited('1') : HttpResponse.json(session('restored'));
+        });
+
+        render(
+            <SessionProvider>
+                <p>Dashboard content</p>
+            </SessionProvider>,
+        );
+
+        expect(await screen.findByText("Can't reach TaskMaster")).toBeInTheDocument();
+        expect(screen.getByText('Too many requests — retrying in 1 s')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Try again/ })).toBeInTheDocument();
+        expect(router.replace).not.toHaveBeenCalled();
+
+        expect(
+            await screen.findByText('Dashboard content', undefined, { timeout: 3000 }),
+        ).toBeInTheDocument();
+        expect(refresh.count).toBe(2);
         expect(router.replace).not.toHaveBeenCalled();
     });
 });
