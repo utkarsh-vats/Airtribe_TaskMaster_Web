@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { adjustTaskCount } from '@/features/tasks/countCache';
 import { api, unwrap, unwrapPage } from '@/lib/api/client';
 import { isApiError } from '@/lib/api/errors';
 import { notifyError } from '@/lib/api/notify';
@@ -52,37 +53,6 @@ export function useComments(projectId: string, taskId: TaskScope) {
 }
 
 export type NewComment = { body: string; taskId: string | null };
-
-/** Rows in a cached task list or detail. */
-type Row = Record<string, unknown> & { id: string };
-const hasItems = (data: unknown): data is { items: Row[] } =>
-    typeof data === 'object' && data !== null && 'items' in data && Array.isArray(data.items);
-
-/** Add `delta` to a task's commentCount in its detail and any cached list row that carries it. */
-function adjustCommentCount(
-    queryClient: QueryClient,
-    projectId: string,
-    taskId: string | null,
-    delta: number,
-) {
-    if (!taskId) return;
-    const withCount = (row: Row): Row =>
-        typeof row.commentCount === 'number'
-            ? { ...row, commentCount: Math.max(0, row.commentCount + delta) }
-            : row;
-    const detailKey = queryKeys.tasks.detail(projectId, taskId);
-    const detail = queryClient.getQueryData<Row>(detailKey);
-    if (detail) queryClient.setQueryData(detailKey, withCount(detail));
-    for (const [listKey, data] of queryClient.getQueriesData({
-        queryKey: queryKeys.tasks.root(),
-    })) {
-        if (!hasItems(data) || !data.items.some((row) => row.id === taskId)) continue;
-        queryClient.setQueryData(listKey, {
-            ...data,
-            items: data.items.map((row) => (row.id === taskId ? withCount(row) : row)),
-        });
-    }
-}
 
 /** Replace one comment's fields in its thread's cache. */
 function patchInThread(
@@ -141,7 +111,7 @@ export function useCreateComment(projectId: string) {
                     })),
                 };
             });
-            adjustCommentCount(queryClient, projectId, taskId, 1);
+            adjustTaskCount(queryClient, projectId, taskId, 'commentCount', 1);
             void queryClient.invalidateQueries({ queryKey: key });
         },
     });
@@ -219,7 +189,8 @@ export function useDeleteComment(projectId: string) {
                 };
             });
             // Counted once: a comment already missing from the cache was counted out before.
-            if (removed) adjustCommentCount(queryClient, projectId, comment.taskId, -1);
+            if (removed)
+                adjustTaskCount(queryClient, projectId, comment.taskId, 'commentCount', -1);
             if (alreadyDeleted) toast(COMMENT_ALREADY_DELETED_MESSAGE);
             void queryClient.invalidateQueries({ queryKey: key });
         },

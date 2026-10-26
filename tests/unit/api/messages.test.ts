@@ -16,7 +16,7 @@ describe('errorMessage', () => {
         [403, ERROR_CODES.FORBIDDEN, "You don't have permission to do that."],
         [404, ERROR_CODES.NOT_FOUND, "That doesn't exist, or you no longer have access to it."],
         [410, ERROR_CODES.INVITATION_EXPIRED, 'This invitation has expired.'],
-        [413, ERROR_CODES.PAYLOAD_TOO_LARGE, 'File is too large (max 10 MB).'],
+        [413, ERROR_CODES.PAYLOAD_TOO_LARGE, 'Too large — max 10 MB.'],
         [415, ERROR_CODES.UNSUPPORTED_MEDIA_TYPE, "That file type isn't allowed."],
         [422, ERROR_CODES.VALIDATION_ERROR, 'Please check the highlighted fields.'],
         [429, ERROR_CODES.RATE_LIMITED, 'Too many attempts — try again in a minute.'],

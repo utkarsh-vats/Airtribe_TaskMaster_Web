@@ -124,19 +124,33 @@ export function setAccessTokenGetter(getter: AccessTokenGetter = storeToken) {
     accessTokenGetter = getter;
 }
 
+/** The current access token (the session store's, unless a test replaced it). */
+export const currentAccessToken = () => accessTokenGetter();
+
+/**
+ * After a 401 TOKEN_EXPIRED for a request sent with `staleToken`: the token to retry with, or
+ * null to give up. Also used by uploads (XMLHttpRequest, outside this client).
+ */
+export async function tokenAfterExpiry(staleToken: string | null): Promise<string | null> {
+    // Another request may already have refreshed while this one was in flight.
+    const current = validAccessToken();
+    if (current && current !== staleToken) return current;
+    return refreshSession();
+}
+
+/**
+ * After tokenAfterExpiry gave no token: whether the session is over. refresh.ts ends it only
+ * when the refresh is rejected (401 / 4xx, not 429).
+ */
+export const isSessionOver = () => sessionStore.get().status === 'unauthenticated';
+
 /** The app's API client, wired to the session: bearer token, refresh-and-retry, sign-out. */
 export const api = createApiClient({
     baseUrl: env.NEXT_PUBLIC_API_URL,
-    getAccessToken: () => accessTokenGetter(),
-    async onTokenExpired(staleToken) {
-        // Another request may already have refreshed while this one was in flight.
-        const current = validAccessToken();
-        if (current && current !== staleToken) return current;
-        return refreshSession();
-    },
+    getAccessToken: currentAccessToken,
+    onTokenExpired: tokenAfterExpiry,
     onUnauthorized: sessionEnded,
-    // refresh.ts ends the session only when the refresh is rejected (401 / 4xx, not 429).
-    isSessionOver: () => sessionStore.get().status === 'unauthenticated',
+    isSessionOver,
 });
 
 // ── result helpers ─────────────────────────────────────────────────────────────────────

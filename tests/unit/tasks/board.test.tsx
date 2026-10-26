@@ -340,6 +340,7 @@ describe('column states', () => {
 });
 
 describe('100+ guard', () => {
+    // Renders 100 cards: slow under load (CI), so it gets more than the default 5 s.
     it('says "Showing 100 of N" and links to that status in the list, keeping the filters', async () => {
         const hundred = Array.from({ length: 100 }, (_, i) => task(`o${i}`));
         mockBoard({ OPEN: { items: hundred, total: 250 } });
@@ -356,7 +357,7 @@ describe('100+ guard', () => {
         // Columns within the limit have no footer.
         await within(column('In progress')).findByText('Finalise homepage hero copy');
         expect(within(column('In progress')).queryByText(/^Showing/)).not.toBeInTheDocument();
-    });
+    }, 15_000);
 });
 
 describe('board toolbar', () => {

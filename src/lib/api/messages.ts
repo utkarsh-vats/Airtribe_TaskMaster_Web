@@ -1,6 +1,11 @@
+import { env } from '@/lib/env';
+
 import { ERROR_CODES, isApiError } from './errors';
 
 export const FALLBACK_ERROR_MESSAGE = 'Something went wrong.';
+/** A 413, or a file over the limit before it's sent (NEXT_PUBLIC_MAX_UPLOAD_MB). */
+export const TOO_LARGE_MESSAGE = `Too large — max ${env.NEXT_PUBLIC_MAX_UPLOAD_MB} MB.`;
+export const TYPE_NOT_ALLOWED_MESSAGE = "That file type isn't allowed.";
 
 /** Codes whose text doesn't follow from the status alone. */
 const MESSAGES_BY_CODE: Partial<Record<string, string>> = {
@@ -17,8 +22,8 @@ const MESSAGES_BY_STATUS: Partial<Record<number, string>> = {
     403: "You don't have permission to do that.",
     404: "That doesn't exist, or you no longer have access to it.",
     410: 'This invitation has expired.',
-    413: 'File is too large (max 10 MB).',
-    415: "That file type isn't allowed.",
+    413: TOO_LARGE_MESSAGE,
+    415: TYPE_NOT_ALLOWED_MESSAGE,
     422: 'Please check the highlighted fields.',
     429: 'Too many attempts — try again in a minute.',
 };
