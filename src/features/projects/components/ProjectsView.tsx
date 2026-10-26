@@ -12,6 +12,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { errorMessage } from '@/lib/api/messages';
 import { pageParam, useUrlWith } from '@/lib/hooks/useUrlWith';
+import { queryView } from '@/lib/query/view';
 
 import { useProjects } from '../api';
 import { NewProjectDialog } from './NewProjectDialog';
@@ -28,6 +29,7 @@ export function ProjectsView() {
     const searchParams = useSearchParams();
     const page = pageParam(searchParams.get('page'));
     const projects = useProjects({ page, limit: PROJECTS_PAGE_SIZE });
+    const view = queryView(projects);
 
     const [dialogOpen, setDialogOpen] = useState(false);
     const openFromUrl = searchParams.get('new') === '1';
@@ -54,16 +56,16 @@ export function ProjectsView() {
                 {newProjectButton}
             </div>
 
-            {projects.isPending ? (
+            {view.status === 'loading' ? (
                 <ProjectsSkeleton />
-            ) : projects.isError ? (
+            ) : view.status === 'error' ? (
                 <ErrorState
                     title="Couldn't load projects"
-                    message={errorMessage(projects.error)}
+                    message={errorMessage(view.error)}
                     retrying={projects.isRefetching}
                     onRetry={() => void projects.refetch()}
                 />
-            ) : projects.data.items.length === 0 ? (
+            ) : view.data.items.length === 0 ? (
                 page > 1 ? (
                     <EmptyState
                         title="Nothing on this page"
@@ -91,7 +93,7 @@ export function ProjectsView() {
                         aria-busy={projects.isPlaceholderData || undefined}
                         className={`${GRID} m-0 list-none p-0 transition-opacity ${projects.isPlaceholderData ? 'opacity-60' : ''}`}
                     >
-                        {projects.data.items.map((project) => (
+                        {view.data.items.map((project) => (
                             <li key={project.id} className="flex">
                                 <ProjectCard project={project} />
                             </li>
@@ -99,7 +101,7 @@ export function ProjectsView() {
                     </ul>
                     <Pagination
                         page={page}
-                        totalPages={projects.data.meta.totalPages}
+                        totalPages={view.data.meta.totalPages}
                         onPageChange={(next) =>
                             router.push(urlWith({ page: next === 1 ? null : String(next) }))
                         }

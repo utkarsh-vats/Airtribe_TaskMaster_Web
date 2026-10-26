@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { attachmentListKey } from '@/features/attachments/api';
 import { AttachmentList } from '@/features/attachments/components/AttachmentList';
 import { fileKind } from '@/features/attachments/fileKind';
 import type { Attachment, User } from '@/lib/api/types';
@@ -15,6 +16,7 @@ import { resetRefreshForTests, startSession } from '@/lib/auth/refresh';
 import { sessionStore } from '@/lib/auth/store';
 
 import { API_ORIGIN, server } from '../../msw/server';
+import { refetchAndFail } from '../../refetch';
 
 const listUrl = `${API_ORIGIN}/api/v1/projects/p1/attachments`;
 
@@ -68,8 +70,10 @@ function mockList(files: Attachment[]) {
     return requests;
 }
 
+let client: QueryClient;
+
 function renderList(taskId: string | null = 't1', count?: number) {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
         <QueryClientProvider client={client}>
             <AttachmentList projectId="p1" taskId={taskId} count={count} />
@@ -190,6 +194,29 @@ describe('states', () => {
             'aria-busy',
             'true',
         );
+    });
+
+    it('a background refetch that fails keeps the files on screen (no error state)', async () => {
+        mockList([
+            attachment({ originalName: 'one.txt' }),
+            attachment({ originalName: 'two.txt' }),
+        ]);
+        renderList();
+        await screen.findByText('two.txt');
+
+        server.use(
+            http.get(listUrl, () =>
+                HttpResponse.json(
+                    { error: { code: 'INTERNAL_ERROR', message: 'Boom', requestId: 'r' } },
+                    { status: 500 },
+                ),
+            ),
+        );
+        await refetchAndFail(client, attachmentListKey('p1', 't1'));
+
+        expect(rows()).toHaveLength(2);
+        expect(screen.getByText('one.txt')).toBeVisible();
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
     it('error, then Try again', async () => {

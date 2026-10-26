@@ -215,6 +215,7 @@ A dev-only `/dev/ui` page renders every component in both themes (the prototype'
 | 429 | toast "Too many attempts — try again in a minute" |
 | 502 / 503 (AI) | inline message next to the AI button (button stays) / unavailable message for this dialog, then the row is hidden for the session |
 | network / 5xx | toast with a Retry action; queries show ErrorState |
+| any error on a background refetch | Background refetch failures keep the current data; the error state is only for a failed first load. Silent — no toast (focus / reconnect refetches would spam); the next refetch recovers. `queryView()` (`src/lib/query/view.ts`) decides loading / error / ready; placeholder data (previous page or filters) doesn't count as data. A 404 / 422 on the project or the open task still shows "not found", since it means the thing is gone. |
 
 ---
 

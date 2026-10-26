@@ -19,6 +19,7 @@ import { errorMessage } from '@/lib/api/messages';
 import type { Attachment } from '@/lib/api/types';
 import { formatBytes } from '@/lib/format/bytes';
 import { queryKeys } from '@/lib/query/keys';
+import { queryView } from '@/lib/query/view';
 
 import { fileKind } from '../fileKind';
 import { previewKind, TEXT_PREVIEW_BYTES, type PreviewKind } from '../preview';
@@ -75,8 +76,11 @@ export function AttachmentPreview({
         // Files are up to 10 MB: never kept once the preview moves on (that also aborts it).
         gcTime: 0,
         retry: false,
+        // Loaded once per showing: no refetch on window focus or reconnect.
+        staleTime: Infinity,
     });
 
+    const previewView = queryView(preview);
     const count = attachments.length;
     const hasPrev = index !== null && index > 0;
     const hasNext = index !== null && index < count - 1;
@@ -132,21 +136,21 @@ export function AttachmentPreview({
                     {downloadButton('primary')}
                 </div>
             );
-        } else if (preview.isPending) {
+        } else if (previewView.status === 'loading') {
             body = (
                 <div aria-busy="true">
                     <span className="sr-only">Loading preview…</span>
                     <Skeleton height="50vh" className="block" />
                 </div>
             );
-        } else if (preview.isError) {
-            body = isFileGone(preview.error) ? (
+        } else if (previewView.status === 'error') {
+            body = isFileGone(previewView.error) ? (
                 <p className="text-muted m-0 py-10 text-center">{FILE_GONE_MESSAGE}</p>
             ) : (
                 <ErrorState
                     compact
                     title="Couldn't load the preview"
-                    message={errorMessage(preview.error)}
+                    message={errorMessage(previewView.error)}
                     retrying={preview.isRefetching}
                     onRetry={() => void preview.refetch()}
                 />
@@ -154,18 +158,23 @@ export function AttachmentPreview({
         } else if (kind === 'text') {
             body = (
                 <div className="flex flex-col gap-2">
-                    {preview.data.truncated && (
+                    {previewView.data.truncated && (
                         <p className="text-muted m-0 text-[13px]">{TRUNCATED_MESSAGE}</p>
                     )}
                     {/* Plain text: React escapes it, so markup in the file shows as written. */}
                     <pre className="m-0 font-mono text-[13px] break-words whitespace-pre-wrap">
-                        {preview.data.text}
+                        {previewView.data.text}
                     </pre>
                 </div>
             );
         } else {
             body = (
-                <BlobView key={attachment.id} blob={preview.data.blob} kind={kind} name={name} />
+                <BlobView
+                    key={attachment.id}
+                    blob={previewView.data.blob}
+                    kind={kind}
+                    name={name}
+                />
             );
         }
     }

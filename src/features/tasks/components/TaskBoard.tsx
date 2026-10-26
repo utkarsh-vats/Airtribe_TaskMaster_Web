@@ -30,6 +30,7 @@ import { errorMessage } from '@/lib/api/messages';
 import type { TaskListItem, TaskStatus } from '@/lib/api/types';
 import { STATUS_LABELS, TASK_STATUSES } from '@/lib/domain';
 import { isPlainClick } from '@/lib/react/plainClick';
+import { queryView } from '@/lib/query/view';
 
 import { BOARD_COLUMN_LIMIT, boardColumnKey, useBoardColumn, useUpdateTask } from '../api';
 import {
@@ -195,7 +196,8 @@ function BoardColumn({
     const dimmed = column.isPlaceholderData;
 
     let body;
-    if (column.isPending) {
+    const view = queryView(column);
+    if (view.status === 'loading') {
         body = (
             <div aria-busy="true" className="flex flex-col gap-2">
                 <span className="sr-only">Loading {label} tasks…</span>
@@ -208,20 +210,20 @@ function BoardColumn({
                 ))}
             </div>
         );
-    } else if (column.isError) {
+    } else if (view.status === 'error') {
         body = (
             <ErrorState
                 compact
                 title="Couldn't load tasks"
-                message={errorMessage(column.error)}
+                message={errorMessage(view.error)}
                 retrying={column.isRefetching}
                 onRetry={() => void column.refetch()}
             />
         );
-    } else if (column.data.items.length === 0) {
+    } else if (view.data.items.length === 0) {
         body = <p className="text-muted m-0 py-2 text-sm">No tasks</p>;
     } else {
-        const { items, meta } = column.data;
+        const { items, meta } = view.data;
         const href = listHref(status);
         body = (
             <>

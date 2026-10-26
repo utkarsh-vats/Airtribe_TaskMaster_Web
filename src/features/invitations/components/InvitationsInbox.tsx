@@ -13,6 +13,7 @@ import { RoleTag } from '@/components/ui/Tag';
 import { errorMessage } from '@/lib/api/messages';
 import type { MyInvitation } from '@/lib/api/types';
 import { fullDateTime, relativeTime, timeUntil } from '@/lib/format/dates';
+import { queryView } from '@/lib/query/view';
 
 import {
     isStaleInvitation,
@@ -30,7 +31,8 @@ export function InvitationsInbox() {
     const invitations = usePendingInvitations();
 
     let body;
-    if (invitations.isPending) {
+    const view = queryView(invitations);
+    if (view.status === 'loading') {
         body = (
             <div aria-busy="true" className="flex flex-col border-t-rule border-divider">
                 <span className="sr-only">Loading invitations…</span>
@@ -42,16 +44,16 @@ export function InvitationsInbox() {
                 ))}
             </div>
         );
-    } else if (invitations.isError) {
+    } else if (view.status === 'error') {
         body = (
             <ErrorState
                 title="Couldn't load your invitations"
-                message={errorMessage(invitations.error)}
+                message={errorMessage(view.error)}
                 retrying={invitations.isRefetching}
                 onRetry={() => void invitations.refetch()}
             />
         );
-    } else if (!invitations.data.length) {
+    } else if (!view.data.length) {
         body = (
             <EmptyState
                 title="No pending invitations"
@@ -64,7 +66,7 @@ export function InvitationsInbox() {
                 aria-label="Pending invitations"
                 className="m-0 list-none border-t-rule border-divider p-0"
             >
-                {invitations.data.map((invitation) => (
+                {view.data.map((invitation) => (
                     <InvitationRow key={invitation.id} invitation={invitation} />
                 ))}
             </ul>

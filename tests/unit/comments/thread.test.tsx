@@ -12,6 +12,7 @@ import type * as Sonner from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '@/components/ui/Tooltip';
+import { commentThreadKey } from '@/features/comments/api';
 import { TASK_GONE_MESSAGE } from '@/features/comments/components/CommentComposer';
 import { CommentThread } from '@/features/comments/components/CommentThread';
 import { bindPermissions } from '@/features/projects/permissions';
@@ -26,6 +27,7 @@ import { queryKeys } from '@/lib/query/keys';
 
 import { emptyAttachments } from '../../msw/attachments';
 import { API_ORIGIN, server } from '../../msw/server';
+import { refetchAndFail } from '../../refetch';
 
 const nav = vi.hoisted(() => ({ search: '' }));
 vi.mock('next/navigation', () => ({
@@ -201,6 +203,28 @@ describe('the list', () => {
         const item = (await screen.findByText('From the future')).closest('li') as HTMLElement;
         expect(within(item).getByText('just now').tagName).toBe('TIME');
         expect(item).not.toHaveTextContent(/in \d+ min/);
+    });
+
+    it('a background refetch that fails keeps the comments on screen, silently', async () => {
+        mockComments([comment({ body: 'First' }), comment({ body: 'Second' })]);
+        renderThread();
+        await screen.findByText('Second');
+
+        server.use(
+            http.get(commentsUrl, () =>
+                HttpResponse.json(
+                    { error: { code: 'INTERNAL_ERROR', message: 'Boom', requestId: 'r' } },
+                    { status: 500 },
+                ),
+            ),
+        );
+        await refetchAndFail(client, commentThreadKey('p1', 't1'));
+
+        expect(items()).toHaveLength(2);
+        expect(screen.getByText('First')).toBeVisible();
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        // No toast either: focus / reconnect refetches would spam it.
+        expect(toast.error).not.toHaveBeenCalled();
     });
 
     it('never renders a body as HTML', async () => {

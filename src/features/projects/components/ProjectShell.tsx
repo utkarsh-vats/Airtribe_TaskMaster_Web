@@ -11,10 +11,11 @@ import { NativeSelect } from '@/components/ui/Input';
 import { LinkTabs } from '@/components/ui/LinkTabs';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { RoleTag } from '@/components/ui/Tag';
-import { isApiError } from '@/lib/api/errors';
+import { isNotFound } from '@/lib/api/errors';
 import { errorMessage } from '@/lib/api/messages';
 import type { ProjectDetail } from '@/lib/api/types';
 import { useSession } from '@/lib/auth/SessionProvider';
+import { queryView } from '@/lib/query/view';
 
 import { useProject, useProjects } from '../api';
 import { bindPermissions } from '../permissions';
@@ -50,23 +51,24 @@ function currentTab(pathname: string, projectId: string): TabSegment {
  */
 export function ProjectShell({ projectId, children }: { projectId: string; children: ReactNode }) {
     const project = useProject(projectId);
+    const view = queryView(project);
 
-    if (project.isPending) return <ProjectHeaderSkeleton />;
-
-    if (project.isError) {
-        const status = isApiError(project.error) ? project.error.status : 0;
-        if (status === 404 || status === 422) return <ProjectNotFound />;
+    // A 404 (or 422) is an answer, not a hiccup: the project is gone or you're no longer in it,
+    // so it replaces the page even when it comes from a background refetch.
+    if (project.isError && isNotFound(project.error)) return <ProjectNotFound />;
+    if (view.status === 'loading') return <ProjectHeaderSkeleton />;
+    if (view.status === 'error') {
         return (
             <ErrorState
                 title="Couldn't load this project"
-                message={errorMessage(project.error)}
+                message={errorMessage(view.error)}
                 retrying={project.isRefetching}
                 onRetry={() => void project.refetch()}
             />
         );
     }
 
-    return <LoadedProject project={project.data}>{children}</LoadedProject>;
+    return <LoadedProject project={view.data}>{children}</LoadedProject>;
 }
 
 function LoadedProject({ project, children }: { project: ProjectDetail; children: ReactNode }) {

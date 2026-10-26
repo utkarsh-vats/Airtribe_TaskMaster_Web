@@ -16,6 +16,7 @@ import type { Attachment } from '@/lib/api/types';
 import { useSession } from '@/lib/auth/SessionProvider';
 import { formatBytes } from '@/lib/format/bytes';
 import { fullDateTime, relativeTime } from '@/lib/format/dates';
+import { queryView } from '@/lib/query/view';
 
 import { UPLOAD_ACCEPT } from '../allowlist';
 import { useAttachments, useDeleteAttachment } from '../api';
@@ -84,7 +85,8 @@ export function AttachmentList({
     };
 
     let body;
-    if (list.isPending) {
+    const view = queryView(list);
+    if (view.status === 'loading') {
         body = (
             <div aria-busy="true" className="flex flex-col gap-3">
                 <span className="sr-only">Loading attachments…</span>
@@ -99,12 +101,12 @@ export function AttachmentList({
                 ))}
             </div>
         );
-    } else if (list.isError) {
+    } else if (view.status === 'error') {
         body = (
             <ErrorState
                 compact
                 title="Couldn't load attachments"
-                message={errorMessage(list.error)}
+                message={errorMessage(view.error)}
                 retrying={list.isRefetching}
                 onRetry={() => void list.refetch()}
             />

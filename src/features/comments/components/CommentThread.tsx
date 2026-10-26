@@ -10,6 +10,7 @@ import { useProject } from '@/features/projects/api';
 import { bindPermissions } from '@/features/projects/permissions';
 import { errorMessage } from '@/lib/api/messages';
 import { useSession } from '@/lib/auth/SessionProvider';
+import { queryView } from '@/lib/query/view';
 
 import { useComments } from '../api';
 import { CommentComposer } from './CommentComposer';
@@ -57,7 +58,8 @@ export function CommentThread({
     const shown = count === undefined ? thread.data?.pages[0]?.meta.total : count;
 
     let body;
-    if (thread.isPending) {
+    const view = queryView(thread);
+    if (view.status === 'loading') {
         body = (
             <div aria-busy="true" className="flex flex-col gap-3">
                 <span className="sr-only">Loading comments…</span>
@@ -72,18 +74,18 @@ export function CommentThread({
                 ))}
             </div>
         );
-    } else if (thread.isError) {
+    } else if (view.status === 'error') {
         body = (
             <ErrorState
                 compact
                 title="Couldn't load comments"
-                message={errorMessage(thread.error)}
+                message={errorMessage(view.error)}
                 retrying={thread.isRefetching}
                 onRetry={() => void thread.refetch()}
             />
         );
     } else {
-        const comments = thread.data.pages.flatMap((page) => page.items);
+        const comments = view.data.pages.flatMap((page) => page.items);
         body = comments.length ? (
             <>
                 <ol aria-labelledby={headingId} className="m-0 flex list-none flex-col gap-3 p-0">

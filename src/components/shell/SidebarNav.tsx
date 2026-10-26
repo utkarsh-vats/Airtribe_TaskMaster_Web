@@ -12,6 +12,7 @@ import { RoleTag } from '@/components/ui/Tag';
 import { useMyInvitationsCount } from '@/features/invitations/api';
 import { SIDEBAR_PROJECT_LIMIT, useProjects } from '@/features/projects/api';
 import { errorMessage } from '@/lib/api/messages';
+import { queryView } from '@/lib/query/view';
 
 type SidebarNavProps = {
     /** Called when a link is followed (the drawer closes, even for the current page). */
@@ -128,8 +129,9 @@ function InvitationsLink(props: LinkProps) {
 
 function ProjectList({ pathname, onNavigate }: LinkProps) {
     const projects = useProjects();
+    const view = queryView(projects);
 
-    if (projects.isPending) {
+    if (view.status === 'loading') {
         return (
             <div aria-busy="true" className="flex flex-col gap-3 px-[10px] py-2">
                 <span className="sr-only">Loading projects…</span>
@@ -140,12 +142,12 @@ function ProjectList({ pathname, onNavigate }: LinkProps) {
         );
     }
 
-    if (projects.isError) {
+    if (view.status === 'error') {
         return (
             <ErrorState
                 compact
                 title="Couldn't load projects"
-                message={errorMessage(projects.error)}
+                message={errorMessage(view.error)}
                 retrying={projects.isRefetching}
                 onRetry={() => void projects.refetch()}
                 className="px-[10px]"
@@ -153,7 +155,7 @@ function ProjectList({ pathname, onNavigate }: LinkProps) {
         );
     }
 
-    const { items, meta } = projects.data;
+    const { items, meta } = view.data;
     if (items.length === 0) {
         return <p className="text-muted m-0 px-[10px] py-2 text-sm">No projects yet</p>;
     }

@@ -63,6 +63,14 @@ export function isApiError(error: unknown): error is ApiError {
     return error instanceof ApiError;
 }
 
+/**
+ * The resource isn't there for you: a 404 (deleted, or you're not in its project) or the 422
+ * the API sends for a malformed id in the URL. An answer, not a transient failure.
+ */
+export function isNotFound(error: unknown): error is ApiError {
+    return isApiError(error) && (error.status === 404 || error.status === 422);
+}
+
 export function hasCode(error: unknown, code: ErrorCode): error is ApiError {
     return isApiError(error) && error.code === code;
 }

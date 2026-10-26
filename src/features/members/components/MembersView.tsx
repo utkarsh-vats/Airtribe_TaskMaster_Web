@@ -23,6 +23,7 @@ import { errorMessage } from '@/lib/api/messages';
 import type { Member } from '@/lib/api/types';
 import { useSession } from '@/lib/auth/SessionProvider';
 import { fullDateTime, shortDate } from '@/lib/format/dates';
+import { queryView } from '@/lib/query/view';
 
 import {
     isMemberGone,
@@ -137,7 +138,8 @@ function MembersSection({ projectId }: { projectId: string }) {
     };
 
     let body;
-    if (members.isPending) {
+    const view = queryView(members);
+    if (view.status === 'loading') {
         body = (
             <>
                 <div className="hidden md:block">
@@ -163,18 +165,18 @@ function MembersSection({ projectId }: { projectId: string }) {
                 </div>
             </>
         );
-    } else if (members.isError) {
+    } else if (view.status === 'error') {
         body = (
             <ErrorState
                 title="Couldn't load members"
-                message={errorMessage(members.error)}
+                message={errorMessage(view.error)}
                 retrying={members.isRefetching}
                 onRetry={() => void members.refetch()}
             />
         );
     } else {
         // A project always has its owner, so the list is never empty.
-        const rows = members.data.map((member) => ({
+        const rows = view.data.map((member) => ({
             member,
             isMe: member.user.id === meId,
             actions: actionsFor(member),

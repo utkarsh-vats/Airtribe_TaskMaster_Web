@@ -14,9 +14,11 @@ import { ProjectShell } from '@/features/projects/components/ProjectShell';
 import type { Member, ProjectDetail, User } from '@/lib/api/types';
 import { resetRefreshForTests, startSession } from '@/lib/auth/refresh';
 import { sessionStore } from '@/lib/auth/store';
+import { queryKeys } from '@/lib/query/keys';
 
 import { emptyInvitations } from '../../msw/invitations';
 import { API_ORIGIN, server } from '../../msw/server';
+import { refetchAndFail } from '../../refetch';
 
 vi.mock('next/navigation', () => ({
     usePathname: () => '/dashboard/projects/p1/members',
@@ -85,8 +87,10 @@ function mockApi(
     );
 }
 
+let client: QueryClient;
+
 function renderMembers() {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
         <QueryClientProvider client={client}>
             <ProjectShell projectId="p1">
@@ -186,6 +190,28 @@ describe('states', () => {
             'true',
         );
         expect(screen.queryByTestId('member-count')).not.toBeInTheDocument();
+    });
+
+    it('a background refetch that fails keeps the members on screen (no error state)', async () => {
+        mockApi();
+        renderMembers();
+        await screen.findByRole('table', { name: 'Members' });
+
+        server.use(
+            http.get(api('/p1/members'), () =>
+                HttpResponse.json(
+                    { error: { code: 'INTERNAL_ERROR', message: 'Boom', requestId: 'r' } },
+                    { status: 500 },
+                ),
+            ),
+        );
+        await refetchAndFail(client, queryKeys.members.list('p1'));
+
+        expect(
+            within(screen.getByRole('table', { name: 'Members' })).getByText('Jonas Weber'),
+        ).toBeVisible();
+        expect(screen.getByTestId('member-count')).toHaveTextContent('3');
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
     it('error, then Try again', async () => {

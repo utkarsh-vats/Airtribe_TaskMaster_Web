@@ -22,6 +22,7 @@ import { STATUS_LABELS, TASK_STATUSES } from '@/lib/domain';
 import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { useUrlWith } from '@/lib/hooks/useUrlWith';
 import { isPlainClick } from '@/lib/react/plainClick';
+import { queryView } from '@/lib/query/view';
 
 import { useTasks, useTaskStatusCounts, type StatusCounts } from '../api';
 import { useFilterBarOpen } from '../filterBarOpen';
@@ -267,7 +268,8 @@ function TaskListBody() {
         );
     }
 
-    if (tasks.isPending) {
+    const tasksView = queryView(tasks);
+    if (tasksView.status === 'loading') {
         return (
             <div className="flex flex-col gap-4">
                 {toolbar}
@@ -276,13 +278,13 @@ function TaskListBody() {
         );
     }
 
-    if (tasks.isError) {
+    if (tasksView.status === 'error') {
         return (
             <div className="flex flex-col gap-4">
                 {toolbar}
                 <ErrorState
                     title="Couldn't load tasks"
-                    message={errorMessage(tasks.error)}
+                    message={errorMessage(tasksView.error)}
                     retrying={tasks.isRefetching}
                     onRetry={() => void tasks.refetch()}
                 />
@@ -290,7 +292,7 @@ function TaskListBody() {
         );
     }
 
-    const { items, meta } = tasks.data;
+    const { items, meta } = tasksView.data;
 
     if (items.length === 0) {
         return (

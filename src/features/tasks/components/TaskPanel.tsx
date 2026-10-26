@@ -18,11 +18,12 @@ import { AttachmentList } from '@/features/attachments/components/AttachmentList
 import { CommentThread } from '@/features/comments/components/CommentThread';
 import { useProject } from '@/features/projects/api';
 import { bindPermissions } from '@/features/projects/permissions';
-import { isApiError } from '@/lib/api/errors';
+import { isNotFound } from '@/lib/api/errors';
 import { errorMessage } from '@/lib/api/messages';
 import { useSession } from '@/lib/auth/SessionProvider';
 import { fullDateTime, relativeTime } from '@/lib/format/dates';
 import { useUrlWith } from '@/lib/hooks/useUrlWith';
+import { queryView } from '@/lib/query/view';
 
 import {
     isFullTask,
@@ -108,34 +109,36 @@ function TaskDetail({
     const task = useTask(projectId, taskId);
     const urlWith = useUrlWith();
 
-    if (task.isError) {
-        const status = isApiError(task.error) ? task.error.status : 0;
-        if (status === 404 || status === 422) {
-            return (
-                <EmptyState
-                    title="Task not found"
-                    body="It may have been deleted."
-                    action={
-                        <Button onClick={() => closeTaskPanel(taskId, urlWith({ task: null }))}>
-                            Close
-                        </Button>
-                    }
-                />
-            );
-        }
+    const view = queryView(task);
+
+    // A 404 (or 422) means the task is gone — deleted by someone else, say — so it replaces
+    // the panel even when it comes from a background refetch.
+    if (task.isError && isNotFound(task.error)) {
+        return (
+            <EmptyState
+                title="Task not found"
+                body="It may have been deleted."
+                action={
+                    <Button onClick={() => closeTaskPanel(taskId, urlWith({ task: null }))}>
+                        Close
+                    </Button>
+                }
+            />
+        );
+    }
+    if (view.status === 'error') {
         return (
             <ErrorState
                 title="Couldn't load this task"
-                message={errorMessage(task.error)}
+                message={errorMessage(view.error)}
                 retrying={task.isRefetching}
                 onRetry={() => void task.refetch()}
             />
         );
     }
+    if (view.status === 'loading') return <TaskDetailSkeleton />;
 
-    if (!task.data) return <TaskDetailSkeleton />;
-
-    return <TaskBody projectId={projectId} task={task.data} onDeleted={onDeleted} />;
+    return <TaskBody projectId={projectId} task={view.data} onDeleted={onDeleted} />;
 }
 
 function TaskBody({
