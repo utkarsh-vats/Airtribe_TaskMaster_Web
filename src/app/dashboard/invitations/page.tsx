@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 
+import { InvitationsInbox } from '@/features/invitations/components/InvitationsInbox';
+
 export const metadata: Metadata = { title: 'Invitations' };
 
-// Placeholder — the invitations inbox comes in step 10d.
 export default function InvitationsPage() {
-    return <h2 className="m-0">Invitations</h2>;
+    return <InvitationsInbox />;
 }

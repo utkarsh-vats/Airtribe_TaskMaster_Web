@@ -92,7 +92,7 @@ Three areas, each with its own layout: **marketing** (`(marketing)` route group)
 | `/dashboard/projects/[projectId]/files` | Project-level attachments | Not in prototype — same attachment list component |
 | `/dashboard/projects/[projectId]/members` | Invite form, members table, invitations table | Per prototype |
 | `/dashboard/projects/[projectId]/settings` | Project details, danger zone | Per prototype |
-| `/dashboard/invitations` | Invitations sent to me — Accept / Decline | Not in prototype |
+| `/dashboard/invitations` | Invitations sent to me — Accept / Decline | Not in prototype — styled like its lists (§9 Invitations inbox) |
 | `/dashboard/notifications` | Full notifications list | Header panel shows the latest 10 |
 | `/dashboard/profile` | Profile, password, sign out | Per prototype, plus bio and avatar URL |
 | `/dev/ui` | Component showcase | Dev only — `notFound()` in production |
@@ -235,6 +235,9 @@ UI checks only hide or disable controls; the API stays the authority. `myRole` c
 ---
 
 ## 9. Notifications
+
+**Invitations inbox** (`InvitationsInbox`, `/dashboard/invitations`): h2 "Invitations" + muted count, then my **pending** invitations newest first. `GET /users/me/invitations` takes no filters and isn't paginated — it returns every status — so non-pending ones (and PENDING past `expiresAt`) are filtered out client-side; the sidebar badge reads the same cache entry. Each row: project name, "{inviter} invited you as {RoleTag}", muted "Sent {relativeTime} · Expires {timeUntil}", primary **Accept** and ghost **Decline** (beside the text from 820px, full-width under it below). A row's buttons are disabled while either of its requests is pending; other rows stay usable. Accept (POST `/invitations/{id}/accept`) → the row leaves the cache once the server agrees (not optimistic), my invitations and all project queries are refetched, toast "You joined {project}" with an **Open project** action. Decline → "Decline the invitation to {project}?" / "You'll need a new invitation to join." → POST `/invitations/{id}/decline` → toast "Invitation declined". A 404 / 409 / 410 (revoked, already answered, expired) toasts its message (`errorMessage`) and refetches, closing the decline dialog; anything else (e.g. 403) is the usual error toast, and the dialog stays open. Empty: EmptyState "No pending invitations" / "When someone invites you to a project, it shows up here."; loading: skeleton rows; error: ErrorState with Try again. Sidebar **Invitations** badge: the pending count, hidden at 0, shown as "9+" above nine; the link reads "Invitations, N pending" to screen readers. No polling — SSE arrives in 12c.
+
 
 - Header button with unread badge (`meta.unreadCount`); panel with the 10 newest, **Mark all read**, and "View all" → `/dashboard/notifications` (filter Unread / All, pagination).
 - Sentences from `type` + `payload` snapshot:

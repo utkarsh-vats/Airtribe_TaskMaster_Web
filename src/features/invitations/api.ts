@@ -1,8 +1,18 @@
 'use client';
 
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+    useMutation,
+    useQueries,
+    useQuery,
+    useQueryClient,
+    type QueryClient,
+} from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import { api, unwrap, unwrapPage } from '@/lib/api/client';
+import { isApiError } from '@/lib/api/errors';
+import { errorMessage } from '@/lib/api/messages';
+import { notifyError } from '@/lib/api/notify';
 import type { Invitation, MyInvitation } from '@/lib/api/types';
 import { queryKeys } from '@/lib/query/keys';
 
@@ -19,11 +29,90 @@ export function useMyInvitations<T = MyInvitation[]>(select?: (data: MyInvitatio
 export const isPendingInvitation = (invitation: MyInvitation, now = Date.now()) =>
     invitation.status === 'PENDING' && Date.parse(invitation.expiresAt) > now;
 
-/** Number of pending invitations, for the sidebar badge. */
+const pendingNewestFirst = (list: MyInvitation[]) =>
+    list
+        .filter((invitation) => isPendingInvitation(invitation))
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+
+/**
+ * The inbox: my pending invitations, newest first. The endpoint takes no filters and returns
+ * every status (not paginated), so the rest is filtered out here.
+ */
+export function usePendingInvitations() {
+    return useMyInvitations(pendingNewestFirst);
+}
+
+/** Number of pending invitations, for the sidebar badge (the same cache entry as the inbox). */
 export function useMyInvitationsCount() {
     return useMyInvitations(
         (list) => list.filter((invitation) => isPendingInvitation(invitation)).length,
     );
+}
+
+// ── answering an invitation (the invitee) ──────────────────────────────────────────────
+
+/** 404 / 409 / 410: revoked, already answered, or expired — it can't be answered any more. */
+export const isStaleInvitation = (error: unknown) =>
+    isApiError(error) && [404, 409, 410].includes(error.status);
+
+/** Take an answered invitation out of my list (after the server agreed), then refetch it. */
+function settleMine(queryClient: QueryClient, invitationId: string) {
+    queryClient.setQueryData<MyInvitation[]>(queryKeys.invitations.mine(), (list) =>
+        list?.filter((invitation) => invitation.id !== invitationId),
+    );
+    void queryClient.invalidateQueries({ queryKey: queryKeys.invitations.mine() });
+}
+
+/**
+ * How a failed answer is reported: a stale invitation (404 / 409 / 410) toasts its message
+ * and my list is refetched (it's no longer pending); anything else is the usual error toast.
+ */
+function reportAnswerError(queryClient: QueryClient, error: unknown) {
+    if (isStaleInvitation(error)) {
+        toast.error(errorMessage(error));
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invitations.mine() });
+    } else {
+        notifyError(error);
+    }
+}
+
+/**
+ * POST /invitations/{id}/accept. Not optimistic: on success the row leaves my list (and the
+ * badge count) and the projects are refetched — I'm a member now. Errors are reported and
+ * rethrown.
+ */
+export function useAcceptInvitation() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (invitation: MyInvitation) =>
+            unwrap(
+                api.POST('/api/v1/invitations/{invitationId}/accept', {
+                    params: { path: { invitationId: invitation.id } },
+                }),
+            ),
+        onSuccess: (_, invitation) => {
+            settleMine(queryClient, invitation.id);
+            void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all() });
+        },
+        onError: (error) => reportAnswerError(queryClient, error),
+    });
+}
+
+/** POST /invitations/{id}/decline. Like accepting, without the projects. */
+export function useDeclineInvitation() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (invitation: MyInvitation) =>
+            unwrap(
+                api.POST('/api/v1/invitations/{invitationId}/decline', {
+                    params: { path: { invitationId: invitation.id } },
+                }),
+            ),
+        onSuccess: (_, invitation) => settleMine(queryClient, invitation.id),
+        onError: (error) => reportAnswerError(queryClient, error),
+    });
 }
 
 // ── a project's invitations (ADMIN+) ───────────────────────────────────────────────────

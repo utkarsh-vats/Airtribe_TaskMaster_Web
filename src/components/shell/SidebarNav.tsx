@@ -103,7 +103,7 @@ function PersonalLink({
                             className="tm-count-badge"
                             data-testid="invitations-badge"
                         >
-                            {badge.count > 99 ? '99+' : badge.count}
+                            {badge.count > 9 ? '9+' : badge.count}
                         </span>
                         <span className="sr-only">{badge.srLabel}</span>
                     </>
