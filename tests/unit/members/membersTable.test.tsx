@@ -1,5 +1,5 @@
 /*
- * The Members tab (10a, read-only): the members table (≥ 820px) and stacked rows (< 820px) in
+ * The Members tab (10a): the members table (≥ 820px) and stacked rows (< 820px) in
  * API order, "(you)", the count, loading / error, and the page title. Rendered inside
  * ProjectShell like the page; both layouts are in the DOM (CSS picks one).
  */
@@ -122,9 +122,10 @@ describe('the table (≥ 820px)', () => {
                 .map((td) => td.textContent),
         );
         expect(cells).toEqual([
+            // The actions (10b, memberActions.test.tsx) for an ADMIN viewer.
             ['PRPriya Ramanpriya@taskmaster.app', 'Owner', 'Jan 5, 2025', ''],
-            ['MOMara Okafor (you)mara@taskmaster.app', 'Admin', 'Mar 4, 2025', ''],
-            ['JWJonas Weberjonas@taskmaster.app', 'Member', 'Jun 20, 2025', ''],
+            ['MOMara Okafor (you)mara@taskmaster.app', 'Admin', 'Mar 4, 2025', 'Leave project'],
+            ['JWJonas Weberjonas@taskmaster.app', 'Member', 'Jun 20, 2025', 'Remove'],
         ]);
         expect(
             within(rows[0] as HTMLElement).getByRole('img', { name: 'Priya Raman' }),
