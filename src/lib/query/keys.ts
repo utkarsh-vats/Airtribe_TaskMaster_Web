@@ -97,6 +97,9 @@ export const queryKeys = {
                 taskId,
                 normalizeFilters(filters),
             ] as const,
+        /** One file's content, for the preview. */
+        blob: (projectId: string, attachmentId: string) =>
+            [...queryKeys.attachments.all(projectId), 'blob', attachmentId] as const,
     },
 
     members: {

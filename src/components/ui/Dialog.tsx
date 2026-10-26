@@ -22,6 +22,8 @@ export type DialogProps = {
     width?: number;
     /** Hide the corner close button (Esc and Cancel still close). */
     hideClose?: boolean;
+    /** Extra buttons in the header, before the close button (e.g. Download). */
+    headerActions?: ReactNode;
     className?: string;
 };
 
@@ -39,6 +41,7 @@ export function Dialog({
     actions,
     width,
     hideClose = false,
+    headerActions,
     className,
 }: DialogProps) {
     return (
@@ -54,9 +57,10 @@ export function Dialog({
                         {...(description ? {} : { 'aria-describedby': undefined })}
                     >
                         <div className="flex items-start gap-2">
-                            <DialogPrimitive.Title className="dialog-title mr-auto">
+                            <DialogPrimitive.Title className="dialog-title mr-auto min-w-0">
                                 {title}
                             </DialogPrimitive.Title>
+                            {headerActions}
                             {!hideClose && (
                                 <DialogPrimitive.Close asChild>
                                     <Button

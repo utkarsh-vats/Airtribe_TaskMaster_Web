@@ -1,17 +1,7 @@
 'use client';
 
 import { clsx } from 'clsx';
-import {
-    Download,
-    File,
-    FileArchive,
-    FileImage,
-    FileSpreadsheet,
-    FileText,
-    Paperclip,
-    Trash2,
-    type LucideIcon,
-} from 'lucide-react';
+import { Download, Paperclip, Trash2 } from 'lucide-react';
 import { useId, useRef, useState, type DragEvent } from 'react';
 
 import { Button } from '@/components/ui/Button';
@@ -29,16 +19,10 @@ import { fullDateTime, relativeTime } from '@/lib/format/dates';
 
 import { UPLOAD_ACCEPT } from '../allowlist';
 import { useAttachments, useDeleteAttachment } from '../api';
-import { fileKind, type FileKind } from '../fileKind';
+import { fileKind } from '../fileKind';
 import { useUploadQueue, type UploadItem } from '../useUploadQueue';
-
-const ICONS: Record<FileKind, LucideIcon> = {
-    image: FileImage,
-    spreadsheet: FileSpreadsheet,
-    archive: FileArchive,
-    document: FileText,
-    other: File,
-};
+import { AttachmentPreview } from './AttachmentPreview';
+import { FILE_ICONS } from './fileIcons';
 
 const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).includes('Files');
 
@@ -81,6 +65,9 @@ export function AttachmentList({
     const can = project.data && user ? bindPermissions(project.data.myRole, user.id) : null;
     // The files being downloaded right now, each with its own spinner.
     const [downloading, setDownloading] = useState<ReadonlySet<string>>(new Set());
+    // The file open in the preview: its index among the loaded files.
+    const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+    const attachments = list.data?.pages.flatMap((page) => page.items) ?? [];
     // Files dragged over the list. dragenter/dragleave fire for every child, hence the depth.
     const [dragging, setDragging] = useState(false);
     const dragDepth = useRef(0);
@@ -123,7 +110,6 @@ export function AttachmentList({
             />
         );
     } else {
-        const attachments = list.data.pages.flatMap((page) => page.items);
         if (attachments.length) {
             body = (
                 <>
@@ -131,7 +117,7 @@ export function AttachmentList({
                         aria-labelledby={headingId}
                         className="m-0 flex list-none flex-col gap-2 p-0"
                     >
-                        {attachments.map((attachment) => (
+                        {attachments.map((attachment, index) => (
                             <AttachmentRow
                                 key={attachment.id}
                                 projectId={projectId}
@@ -139,6 +125,7 @@ export function AttachmentList({
                                 canDelete={can?.deleteAttachment(attachment) ?? false}
                                 downloading={downloading.has(attachment.id)}
                                 onDownload={() => void download(attachment)}
+                                onPreview={() => setPreviewIndex(index)}
                             />
                         ))}
                     </ul>
@@ -161,85 +148,94 @@ export function AttachmentList({
     }
 
     return (
-        <section
-            aria-labelledby={headingId}
-            data-dragging={dragging || undefined}
-            className={clsx(
-                'flex flex-col gap-3',
-                dragging && 'bg-accent-100 outline-accent outline-2',
-                className,
-            )}
-            onDragEnter={(event) => {
-                if (!hasFiles(event)) return;
-                event.preventDefault();
-                dragDepth.current += 1;
-                setDragging(true);
-            }}
-            onDragOver={(event) => {
-                if (!hasFiles(event)) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = 'copy';
-            }}
-            onDragLeave={(event) => {
-                if (!hasFiles(event)) return;
-                dragDepth.current = Math.max(0, dragDepth.current - 1);
-                if (dragDepth.current === 0) setDragging(false);
-            }}
-            onDrop={(event) => {
-                if (!hasFiles(event)) return;
-                event.preventDefault();
-                dragDepth.current = 0;
-                setDragging(false);
-                uploads.add(event.dataTransfer.files);
-            }}
-        >
-            <div className="flex items-center gap-2">
-                <h5 id={headingId} className="m-0">
-                    {heading}
-                </h5>
-                {shown != null && (
-                    <span className="text-muted text-[12px]" data-testid="attachment-count">
-                        {shown}
-                    </span>
+        <>
+            <section
+                aria-labelledby={headingId}
+                data-dragging={dragging || undefined}
+                className={clsx(
+                    'flex flex-col gap-3',
+                    dragging && 'bg-accent-100 outline-accent outline-2',
+                    className,
                 )}
-                <Button
-                    variant="secondary"
-                    size="sm"
-                    className="ml-auto"
-                    onClick={() => input.current?.click()}
-                >
-                    <Paperclip aria-hidden size={14} />
-                    Upload
-                </Button>
-                <input
-                    ref={input}
-                    type="file"
-                    multiple
-                    hidden
-                    accept={UPLOAD_ACCEPT}
-                    aria-label="Choose files to upload"
-                    onChange={(event) => {
-                        if (event.target.files) uploads.add(event.target.files);
-                        // So choosing the same file again still fires change.
-                        event.target.value = '';
-                    }}
-                />
-            </div>
-            {uploads.items.length > 0 && (
-                <ul aria-label="Uploads" className="m-0 flex list-none flex-col gap-2 p-0">
-                    {uploads.items.map((item) => (
-                        <UploadRow
-                            key={item.key}
-                            item={item}
-                            onCancel={() => uploads.cancel(item.key)}
-                            onRetry={() => uploads.retry(item.key)}
-                            onDismiss={() => uploads.dismiss(item.key)}
-                        />
-                    ))}
-                </ul>
-            )}
-            {body}
-        </section>
+                onDragEnter={(event) => {
+                    if (!hasFiles(event)) return;
+                    event.preventDefault();
+                    dragDepth.current += 1;
+                    setDragging(true);
+                }}
+                onDragOver={(event) => {
+                    if (!hasFiles(event)) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'copy';
+                }}
+                onDragLeave={(event) => {
+                    if (!hasFiles(event)) return;
+                    dragDepth.current = Math.max(0, dragDepth.current - 1);
+                    if (dragDepth.current === 0) setDragging(false);
+                }}
+                onDrop={(event) => {
+                    if (!hasFiles(event)) return;
+                    event.preventDefault();
+                    dragDepth.current = 0;
+                    setDragging(false);
+                    uploads.add(event.dataTransfer.files);
+                }}
+            >
+                <div className="flex items-center gap-2">
+                    <h5 id={headingId} className="m-0">
+                        {heading}
+                    </h5>
+                    {shown != null && (
+                        <span className="text-muted text-[12px]" data-testid="attachment-count">
+                            {shown}
+                        </span>
+                    )}
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        className="ml-auto"
+                        onClick={() => input.current?.click()}
+                    >
+                        <Paperclip aria-hidden size={14} />
+                        Upload
+                    </Button>
+                    <input
+                        ref={input}
+                        type="file"
+                        multiple
+                        hidden
+                        accept={UPLOAD_ACCEPT}
+                        aria-label="Choose files to upload"
+                        onChange={(event) => {
+                            if (event.target.files) uploads.add(event.target.files);
+                            // So choosing the same file again still fires change.
+                            event.target.value = '';
+                        }}
+                    />
+                </div>
+                {uploads.items.length > 0 && (
+                    <ul aria-label="Uploads" className="m-0 flex list-none flex-col gap-2 p-0">
+                        {uploads.items.map((item) => (
+                            <UploadRow
+                                key={item.key}
+                                item={item}
+                                onCancel={() => uploads.cancel(item.key)}
+                                onRetry={() => uploads.retry(item.key)}
+                                onDismiss={() => uploads.dismiss(item.key)}
+                            />
+                        ))}
+                    </ul>
+                )}
+                {body}
+            </section>
+            {/* Outside the section: drops on the dialog (a portal) mustn't reach the drop zone. */}
+            <AttachmentPreview
+                projectId={projectId}
+                attachments={attachments}
+                index={previewIndex}
+                onIndexChange={setPreviewIndex}
+            />
+        </>
     );
 }
 
@@ -249,26 +245,34 @@ function AttachmentRow({
     canDelete,
     downloading,
     onDownload,
+    onPreview,
 }: {
     projectId: string;
     attachment: Attachment;
     canDelete: boolean;
     downloading: boolean;
     onDownload: () => void;
+    onPreview: () => void;
 }) {
     const remove = useDeleteAttachment(projectId);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const kind = fileKind(attachment.mimeType);
-    const Icon = ICONS[kind];
+    const Icon = FILE_ICONS[kind];
     const name = attachment.originalName;
 
     return (
         <li className="flex items-center gap-3" data-file-kind={kind}>
             <Icon aria-hidden size={20} className="text-muted flex-none" />
             <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-semibold" title={name}>
+                {/* A button: click or Enter opens the preview. */}
+                <button
+                    type="button"
+                    className="max-w-full cursor-pointer self-start truncate text-left text-sm font-semibold hover:underline"
+                    title={name}
+                    onClick={onPreview}
+                >
                     {name}
-                </span>
+                </button>
                 <span className="text-muted truncate text-[12px]">
                     {formatBytes(attachment.sizeBytes)} · {attachment.uploadedBy.name} ·{' '}
                     <time
