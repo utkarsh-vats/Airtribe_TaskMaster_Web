@@ -22,10 +22,12 @@ export const TASK_GONE_MESSAGE = 'This task no longer exists.';
 export function CommentComposer({
     projectId,
     taskId,
+    placeholder = 'Write a comment',
 }: {
     projectId: string;
     /** null for a project-level comment. */
     taskId: string | null;
+    placeholder?: string | undefined;
 }) {
     const create = useCreateComment(projectId);
     const [draft, setDraft] = useState('');
@@ -72,7 +74,7 @@ export function CommentComposer({
                     autoGrow
                     rows={1}
                     aria-label="Comment"
-                    placeholder="Write a comment"
+                    placeholder={placeholder}
                     value={draft}
                     aria-invalid={error ? true : undefined}
                     aria-describedby={error ? errorId : undefined}

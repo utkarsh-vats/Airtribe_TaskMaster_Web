@@ -52,18 +52,22 @@ const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).incl
 export function AttachmentList({
     projectId,
     taskId,
-    title = 'Attachments',
+    heading = 'Attachments',
     count,
+    emptyText = 'No files yet.',
     className,
 }: {
     projectId: string;
     taskId: string | null;
-    title?: string;
+    /** The section's heading ("Files" on the project's tab). */
+    heading?: string;
     /**
      * The count to show: the task's attachmentCount (null while it isn't known yet, e.g. the panel is
      * still showing the list row), or the list's own total when omitted.
      */
     count?: number | null;
+    /** Shown when there are no files (and none uploading). */
+    emptyText?: string;
     className?: string;
 }) {
     const list = useAttachments(projectId, taskId ?? 'none');
@@ -152,7 +156,7 @@ export function AttachmentList({
                 </>
             );
         } else if (!uploads.items.length) {
-            body = <p className="text-muted m-0 text-sm">No files yet.</p>;
+            body = <p className="text-muted m-0 text-sm">{emptyText}</p>;
         }
     }
 
@@ -191,7 +195,7 @@ export function AttachmentList({
         >
             <div className="flex items-center gap-2">
                 <h5 id={headingId} className="m-0">
-                    {title}
+                    {heading}
                 </h5>
                 {shown != null && (
                     <span className="text-muted text-[12px]" data-testid="attachment-count">

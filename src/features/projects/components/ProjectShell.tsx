@@ -30,6 +30,12 @@ export const PROJECT_TABS = [
 
 type TabSegment = (typeof PROJECT_TABS)[number]['segment'];
 
+/** Tabs whose page has its own title: "{tab} · {project} · TaskMaster". */
+const TAB_TITLES: Partial<Record<TabSegment, string>> = {
+    discussion: 'Discussion',
+    files: 'Files',
+};
+
 /** The tab segment of the current path ("tasks" when there isn't a known one). */
 function currentTab(pathname: string, projectId: string): TabSegment {
     const segment = pathname.slice(`/dashboard/projects/${projectId}/`.length).split('/')[0];
@@ -65,6 +71,7 @@ export function ProjectShell({ projectId, children }: { projectId: string; child
 function LoadedProject({ project, children }: { project: ProjectDetail; children: ReactNode }) {
     const { user } = useSession();
     const userId = user?.id ?? '';
+    const tabTitle = TAB_TITLES[currentTab(usePathname(), project.id)];
 
     const context = useMemo<ProjectContextValue>(
         () => ({
@@ -80,7 +87,11 @@ function LoadedProject({ project, children }: { project: ProjectDetail; children
     return (
         <ProjectContext value={context}>
             {/* React 19 hoists this into <head>; the layout opts out of Next's title. */}
-            <title>{`${project.name} · TaskMaster`}</title>
+            <title>
+                {tabTitle
+                    ? `${tabTitle} · ${project.name} · TaskMaster`
+                    : `${project.name} · TaskMaster`}
+            </title>
             <div className="flex flex-col gap-4">
                 <header className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center gap-2">

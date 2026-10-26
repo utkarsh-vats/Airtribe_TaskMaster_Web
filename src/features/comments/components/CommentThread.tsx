@@ -18,23 +18,31 @@ import { CommentItem } from './CommentItem';
 /**
  * A comment thread (DESIGN.md §6) for a task, or the project-level one (`taskId` null): "Comments"
  * + count, the comments oldest first with "Load more" for the next page, then the composer —
- * any member can comment. Used by the task panel and the project's Discussion tab.
+ * any member can comment. Used by the task panel and the project's Discussion tab (heading,
+ * empty text and placeholder of its own).
  */
 export function CommentThread({
     projectId,
     taskId,
-    title = 'Comments',
+    heading = 'Comments',
     count,
+    emptyText = 'No comments yet.',
+    placeholder,
     className,
 }: {
     projectId: string;
     taskId: string | null;
-    title?: string;
+    /** The section's heading ("Discussion" on the project's tab). */
+    heading?: string;
     /**
      * The count to show: the task's commentCount (null while it isn't known yet, e.g. the panel is
      * still showing the list row), or the thread's own total when omitted.
      */
     count?: number | null;
+    /** Shown when there are no comments. */
+    emptyText?: string;
+    /** The composer's placeholder (default "Write a comment"). */
+    placeholder?: string;
     className?: string;
 }) {
     const thread = useComments(projectId, taskId ?? 'none');
@@ -108,7 +116,7 @@ export function CommentThread({
                 )}
             </>
         ) : (
-            <p className="text-muted m-0 text-sm">No comments yet.</p>
+            <p className="text-muted m-0 text-sm">{emptyText}</p>
         );
     }
 
@@ -116,7 +124,7 @@ export function CommentThread({
         <section aria-labelledby={headingId} className={clsx('flex flex-col gap-3', className)}>
             <div className="flex items-baseline gap-2">
                 <h5 id={headingId} className="m-0">
-                    {title}
+                    {heading}
                 </h5>
                 {shown != null && (
                     <span className="text-muted text-[12px]" data-testid="comment-count">
@@ -125,7 +133,7 @@ export function CommentThread({
                 )}
             </div>
             {body}
-            <CommentComposer projectId={projectId} taskId={taskId} />
+            <CommentComposer projectId={projectId} taskId={taskId} placeholder={placeholder} />
         </section>
     );
 }

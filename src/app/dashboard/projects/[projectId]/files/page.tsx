@@ -1,4 +1,6 @@
-// Placeholder — comes in step 9e. The title is set by ProjectShell (project name).
+import { ProjectFiles } from '@/features/projects/components/ProjectFiles';
+
+// The title is set by ProjectShell ("Files · {project}").
 export default function ProjectFilesPage() {
-    return <h3 className="m-0">Files</h3>;
+    return <ProjectFiles />;
 }
