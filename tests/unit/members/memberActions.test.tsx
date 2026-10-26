@@ -402,7 +402,10 @@ describe('removing', () => {
         const dialog = await confirmIn(u, 'Remove Jonas Weber?', 'Remove');
 
         await vi.waitFor(() => expect(toast.error).toHaveBeenCalledOnce());
-        expect(within(dialog).getByRole('button', { name: 'Remove' })).toBeEnabled();
+        // Re-enabled once the rejection reaches the dialog, just after the toast.
+        await vi.waitFor(() =>
+            expect(within(dialog).getByRole('button', { name: 'Remove' })).toBeEnabled(),
+        );
         expect(screen.getByRole('dialog', { name: 'Remove Jonas Weber?' })).toBeInTheDocument();
         // Still listed (behind the modal, hence hidden).
         expect(

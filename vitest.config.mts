@@ -17,6 +17,9 @@ export default defineConfig({
         // tell same-origin /api/auth/* calls from API calls.
         environmentOptions: { jsdom: { url: 'http://localhost:3001' } },
         setupFiles: ['./tests/setup.ts'],
+        // Room for a few async waits per test: they time out after 1 s locally and 5 s on CI
+        // (tests/setup.ts), so a test gets 5 s locally and 20 s on CI.
+        testTimeout: process.env.CI ? 20_000 : 5_000,
         include: ['tests/unit/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
         css: false,
         // src/lib/env.ts and env.server.ts validate these on import (same values as .env.example).

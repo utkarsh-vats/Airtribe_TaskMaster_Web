@@ -514,7 +514,10 @@ describe('delete', () => {
         await u.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
         await vi.waitFor(() => expect(toast.error).toHaveBeenCalledOnce());
-        expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeEnabled();
+        // Re-enabled once the rejection reaches the dialog, just after the toast.
+        await vi.waitFor(() =>
+            expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeEnabled(),
+        );
         expect(screen.getByRole('dialog', { name: 'Delete this file?' })).toBeInTheDocument();
         expect(screen.getByText('mine.pdf')).toBeInTheDocument();
     });

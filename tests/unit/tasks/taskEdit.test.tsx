@@ -333,7 +333,12 @@ describe('optimistic updates', () => {
         await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Status' }), 'OPEN');
 
         await vi.waitFor(() => expect(toast).toHaveBeenCalledWith(TASK_STATUS_CONFLICT_MESSAGE));
-        expect(within(dialog).getByRole('combobox', { name: 'Status' })).toHaveValue('IN_PROGRESS');
+        // The rollback renders through TanStack's batched notify, possibly after the toast.
+        await vi.waitFor(() =>
+            expect(within(dialog).getByRole('combobox', { name: 'Status' })).toHaveValue(
+                'IN_PROGRESS',
+            ),
+        );
         await vi.waitFor(() => expect(detailGets).toBeGreaterThan(before));
         expect(toast.error).not.toHaveBeenCalled();
     });

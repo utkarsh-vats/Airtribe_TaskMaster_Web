@@ -4,7 +4,7 @@
  * Invite again. Rendered inside ProjectShell + MembersView like the page.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ import { ProjectShell } from '@/features/projects/components/ProjectShell';
 import type { Invitation, Member, ProjectDetail, ProjectRole, User } from '@/lib/api/types';
 import { resetRefreshForTests, startSession } from '@/lib/auth/refresh';
 import { sessionStore } from '@/lib/auth/store';
+import { queryKeys } from '@/lib/query/keys';
 
 import { API_ORIGIN, server } from '../../msw/server';
 
@@ -143,9 +144,11 @@ const apiError =
     () =>
         HttpResponse.json({ error: { code, message, requestId: 'r', details } }, { status });
 
+let client: QueryClient;
+
 function renderTab() {
     startSession({ accessToken: 'at', expiresIn: 900, user: me });
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
         <QueryClientProvider client={client}>
             <ProjectShell projectId="p1">
@@ -242,10 +245,13 @@ describe('sending', () => {
         await vi.waitFor(() =>
             expect(toast.success).toHaveBeenCalledWith('Invitation sent to ana.lopez@company.com'),
         );
+        // The submit has settled (the toast comes just before the form's state catches up).
+        await vi.waitFor(() => expect(send()).not.toHaveAttribute('aria-busy'));
         expect(state.posts).toEqual([{ email: 'ana.lopez@company.com', role: 'MEMBER' }]);
         expect(emailInput()).toHaveValue('');
-        // The new one is in the table (the lists were refetched).
-        expect(await within(table()).findByText('ana.lopez@company.com')).toBeInTheDocument();
+        // The new one is in the table: the lists were refetched, and render once React catches up.
+        const newTable = await screen.findByRole('table', { name: 'Pending invitations' });
+        expect(await within(newTable).findByText('ana.lopez@company.com')).toBeInTheDocument();
     });
 
     it('409 (already a member / already invited): the API’s message under the email', async () => {
@@ -339,6 +345,77 @@ describe('Pending invitations', () => {
             expect.stringMatching(/^lapsed@company\.comMemberSent .+ExpiredInvite again$/),
             expect.stringMatching(/^oldest@company\.comAdminSent .+Expires in 5 daysRevoke$/),
         ]);
+    });
+
+    it('while they refetch (one of the two slower), the rows stay — no skeleton', async () => {
+        mockApi('OWNER', [
+            invitation('i1', 'ana@company.com', 'MEMBER', 'PENDING', HOUR),
+            invitation('i3', 'lapsed@company.com', 'MEMBER', 'EXPIRED', DAY),
+        ]);
+        renderTab();
+        await screen.findByRole('table', { name: 'Pending invitations' });
+
+        let release = () => {};
+        const held = new Promise<void>((resolve) => (release = resolve));
+        let refetches = 0;
+        server.use(
+            http.get(api('/p1/invitations'), async ({ request }) => {
+                refetches += 1;
+                const status = new URL(request.url).searchParams.get('status');
+                // EXPIRED answers late; PENDING at once, with the same row.
+                if (status === 'EXPIRED') await held;
+                const data =
+                    status === 'EXPIRED'
+                        ? [invitation('i3', 'lapsed@company.com', 'MEMBER', 'EXPIRED', DAY)]
+                        : [invitation('i1', 'ana@company.com', 'MEMBER', 'PENDING', HOUR)];
+                return HttpResponse.json({
+                    data,
+                    meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+                });
+            }),
+        );
+        void client.invalidateQueries({ queryKey: queryKeys.invitations.projectAll('p1') });
+
+        await vi.waitFor(() => expect(refetches).toBe(2));
+        // PENDING is back, EXPIRED still on its way: both rows are still shown.
+        expect(within(table()).getByText('ana@company.com')).toBeVisible();
+        expect(within(table()).getByText('lapsed@company.com')).toBeVisible();
+        expect(screen.queryByText('Loading invitations…')).not.toBeInTheDocument();
+        expect(screen.queryByText(NO_INVITATIONS_MESSAGE)).not.toBeInTheDocument();
+
+        release();
+        await vi.waitFor(() =>
+            expect(client.isFetching({ queryKey: queryKeys.invitations.projectAll('p1') })).toBe(0),
+        );
+        expect(within(table()).getAllByRole('row')).toHaveLength(3);
+    });
+
+    it('a background refetch that fails keeps the rows (no error state)', async () => {
+        mockApi('OWNER', [invitation('i1', 'ana@company.com', 'MEMBER', 'PENDING', HOUR)]);
+        renderTab();
+        await screen.findByRole('table', { name: 'Pending invitations' });
+
+        server.use(
+            http.get(api('/p1/invitations'), () =>
+                HttpResponse.json(
+                    { error: { code: 'INTERNAL_ERROR', message: 'Boom', requestId: 'r' } },
+                    { status: 500 },
+                ),
+            ),
+        );
+        await client.invalidateQueries({ queryKey: queryKeys.invitations.projectAll('p1') });
+
+        await vi.waitFor(() =>
+            expect(
+                client.getQueryState(
+                    queryKeys.invitations.project('p1', { status: 'PENDING', limit: 50 }),
+                )?.status,
+            ).toBe('error'),
+        );
+        // Let TanStack's batched notification (a 0 ms timer, queued before this one) re-render.
+        await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+        expect(within(table()).getByText('ana@company.com')).toBeVisible();
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
     it('empty: "No pending invitations."', async () => {

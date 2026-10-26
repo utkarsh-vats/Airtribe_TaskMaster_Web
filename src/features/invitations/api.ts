@@ -145,10 +145,13 @@ export function useProjectInvitations(projectId: string, enabled = true) {
                 ),
             enabled,
         })),
+        // Once both lists have loaded, their rows stay up while either refetches — even if a
+        // background refetch fails (TanStack keeps the data): no skeleton, no error state.
+        // The skeleton is the first load only; the error state is a first load that failed.
         combine: (results) => {
-            const error = results.find((result) => result.isError)?.error ?? null;
             const pages = results.map((result) => result.data);
             const loaded = pages.every((page) => page !== undefined);
+            const error = loaded ? null : (results.find((result) => result.isError)?.error ?? null);
             const data: Invitation[] | undefined = loaded
                 ? pages
                       .flatMap((page) => page?.items ?? [])
