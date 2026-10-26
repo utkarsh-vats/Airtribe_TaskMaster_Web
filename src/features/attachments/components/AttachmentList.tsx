@@ -5,6 +5,7 @@ import { Download, Paperclip, Trash2 } from 'lucide-react';
 import { useId, useRef, useState, type DragEvent } from 'react';
 
 import { Button } from '@/components/ui/Button';
+import { CollapsibleSection } from '@/components/ui/CollapsibleSection';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -40,6 +41,8 @@ export function AttachmentList({
     heading = 'Attachments',
     count,
     emptyText = 'No files yet.',
+    sectionKey,
+    cap,
     className,
 }: {
     projectId: string;
@@ -53,6 +56,10 @@ export function AttachmentList({
     count?: number | null;
     /** Shown when there are no files (and none uploading). */
     emptyText?: string;
+    /** Collapsible (the task panel), its open state remembered under this key. */
+    sectionKey?: string;
+    /** Show only the newest `cap` files, with "Show N more" for the rest. */
+    cap?: number;
     className?: string;
 }) {
     const list = useAttachments(projectId, taskId ?? 'none');
@@ -72,6 +79,8 @@ export function AttachmentList({
     // Files dragged over the list. dragenter/dragleave fire for every child, hence the depth.
     const [dragging, setDragging] = useState(false);
     const dragDepth = useRef(0);
+    // Past the cap: every file, or just the newest. Kept across deletes and uploads.
+    const [expanded, setExpanded] = useState(false);
     const shown = count === undefined ? list.data?.pages[0]?.meta.total : count;
 
     const download = async (attachment: Attachment) => {
@@ -112,6 +121,11 @@ export function AttachmentList({
             />
         );
     } else {
+        // Newest first, as the API sends them (a new upload is prepended, Load more appends
+        // older pages). Capped, the newest `cap` show — a file just uploaded is always among them.
+        const total = Math.max(view.data.pages[0]?.meta.total ?? 0, attachments.length);
+        const capped = cap !== undefined && total > cap;
+        const visible = capped && !expanded ? attachments.slice(0, cap) : attachments;
         if (attachments.length) {
             body = (
                 <>
@@ -119,7 +133,7 @@ export function AttachmentList({
                         aria-labelledby={headingId}
                         className="m-0 flex list-none flex-col gap-2 p-0"
                     >
-                        {attachments.map((attachment, index) => (
+                        {visible.map((attachment, index) => (
                             <AttachmentRow
                                 key={attachment.id}
                                 projectId={projectId}
@@ -131,7 +145,18 @@ export function AttachmentList({
                             />
                         ))}
                     </ul>
-                    {list.hasNextPage && (
+                    {capped && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="self-start"
+                            aria-expanded={expanded}
+                            onClick={() => setExpanded(!expanded)}
+                        >
+                            {expanded ? 'Show less' : `Show ${total - (cap ?? 0)} more`}
+                        </Button>
+                    )}
+                    {list.hasNextPage && (!capped || expanded) && (
                         <Button
                             variant="secondary"
                             size="sm"
@@ -149,87 +174,107 @@ export function AttachmentList({
         }
     }
 
+    const dropZone = {
+        'data-dragging': dragging || undefined,
+        className: clsx(
+            'flex flex-col gap-3',
+            dragging && 'bg-accent-100 outline-accent outline-2',
+            className,
+        ),
+        onDragEnter: (event: DragEvent) => {
+            if (!hasFiles(event)) return;
+            event.preventDefault();
+            dragDepth.current += 1;
+            setDragging(true);
+        },
+        onDragOver: (event: DragEvent) => {
+            if (!hasFiles(event)) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+        },
+        onDragLeave: (event: DragEvent) => {
+            if (!hasFiles(event)) return;
+            dragDepth.current = Math.max(0, dragDepth.current - 1);
+            if (dragDepth.current === 0) setDragging(false);
+        },
+        onDrop: (event: DragEvent) => {
+            if (!hasFiles(event)) return;
+            event.preventDefault();
+            dragDepth.current = 0;
+            setDragging(false);
+            uploads.add(event.dataTransfer.files);
+        },
+    };
+
+    const countBadge = shown != null && <span data-testid="attachment-count">{shown}</span>;
+
+    const uploadControls = (
+        <>
+            <Button variant="secondary" size="sm" onClick={() => input.current?.click()}>
+                <Paperclip aria-hidden size={14} />
+                Upload
+            </Button>
+            <input
+                ref={input}
+                type="file"
+                multiple
+                hidden
+                accept={UPLOAD_ACCEPT}
+                aria-label="Choose files to upload"
+                onChange={(event) => {
+                    if (event.target.files) uploads.add(event.target.files);
+                    // So choosing the same file again still fires change.
+                    event.target.value = '';
+                }}
+            />
+        </>
+    );
+
+    // Files being uploaded go above the list: the newest of all.
+    const content = (
+        <>
+            {uploads.items.length > 0 && (
+                <ul aria-label="Uploads" className="m-0 flex list-none flex-col gap-2 p-0">
+                    {uploads.items.map((item) => (
+                        <UploadRow
+                            key={item.key}
+                            item={item}
+                            onCancel={() => uploads.cancel(item.key)}
+                            onRetry={() => uploads.retry(item.key)}
+                            onDismiss={() => uploads.dismiss(item.key)}
+                        />
+                    ))}
+                </ul>
+            )}
+            {body}
+        </>
+    );
+
     return (
         <>
-            <section
-                aria-labelledby={headingId}
-                data-dragging={dragging || undefined}
-                className={clsx(
-                    'flex flex-col gap-3',
-                    dragging && 'bg-accent-100 outline-accent outline-2',
-                    className,
-                )}
-                onDragEnter={(event) => {
-                    if (!hasFiles(event)) return;
-                    event.preventDefault();
-                    dragDepth.current += 1;
-                    setDragging(true);
-                }}
-                onDragOver={(event) => {
-                    if (!hasFiles(event)) return;
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = 'copy';
-                }}
-                onDragLeave={(event) => {
-                    if (!hasFiles(event)) return;
-                    dragDepth.current = Math.max(0, dragDepth.current - 1);
-                    if (dragDepth.current === 0) setDragging(false);
-                }}
-                onDrop={(event) => {
-                    if (!hasFiles(event)) return;
-                    event.preventDefault();
-                    dragDepth.current = 0;
-                    setDragging(false);
-                    uploads.add(event.dataTransfer.files);
-                }}
-            >
-                <div className="flex items-center gap-2">
-                    <h5 id={headingId} className="m-0">
-                        {heading}
-                    </h5>
-                    {shown != null && (
-                        <span className="text-muted text-[12px]" data-testid="attachment-count">
-                            {shown}
-                        </span>
-                    )}
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        className="ml-auto"
-                        onClick={() => input.current?.click()}
-                    >
-                        <Paperclip aria-hidden size={14} />
-                        Upload
-                    </Button>
-                    <input
-                        ref={input}
-                        type="file"
-                        multiple
-                        hidden
-                        accept={UPLOAD_ACCEPT}
-                        aria-label="Choose files to upload"
-                        onChange={(event) => {
-                            if (event.target.files) uploads.add(event.target.files);
-                            // So choosing the same file again still fires change.
-                            event.target.value = '';
-                        }}
-                    />
-                </div>
-                {uploads.items.length > 0 && (
-                    <ul aria-label="Uploads" className="m-0 flex list-none flex-col gap-2 p-0">
-                        {uploads.items.map((item) => (
-                            <UploadRow
-                                key={item.key}
-                                item={item}
-                                onCancel={() => uploads.cancel(item.key)}
-                                onRetry={() => uploads.retry(item.key)}
-                                onDismiss={() => uploads.dismiss(item.key)}
-                            />
-                        ))}
-                    </ul>
-                )}
-                {body}
-            </section>
+            {sectionKey ? (
+                <CollapsibleSection
+                    sectionKey={sectionKey}
+                    title={heading}
+                    titleId={headingId}
+                    count={countBadge || undefined}
+                    actions={uploadControls}
+                    {...dropZone}
+                >
+                    {content}
+                </CollapsibleSection>
+            ) : (
+                <section aria-labelledby={headingId} {...dropZone}>
+                    <div className="flex items-center gap-2">
+                        <h5 id={headingId} className="m-0">
+                            {heading}
+                        </h5>
+                        {countBadge && <span className="text-muted text-[12px]">{countBadge}</span>}
+                        <div className="ml-auto flex items-center gap-2">{uploadControls}</div>
+                    </div>
+                    {content}
+                </section>
+            )}
             {/* Outside the section: drops on the dialog (a portal) mustn't reach the drop zone. */}
             <AttachmentPreview
                 projectId={projectId}

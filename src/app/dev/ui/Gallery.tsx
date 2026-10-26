@@ -8,6 +8,7 @@ import { ThemeSwitch } from '@/components/shell/ThemeSwitch';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card, CardBody, CardKicker, CardMeta, CardTitle } from '@/components/ui/Card';
+import { CollapsibleSection } from '@/components/ui/CollapsibleSection';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Dialog, DialogClose } from '@/components/ui/Dialog';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -797,6 +798,27 @@ export function Gallery() {
                         <Avatar name="Cher" />
                         <Avatar name="Image Avatar" src={AVATAR_IMAGE} />
                         <Avatar name="Broken Image" src="/missing-avatar.png" />
+                    </div>
+                </Section>
+
+                <Section title="Collapsible section">
+                    <div className={grid}>
+                        <CollapsibleSection
+                            sectionKey="gallery-demo"
+                            title="Attachments"
+                            count={3}
+                            actions={
+                                <Button variant="secondary" size="sm">
+                                    <Plus aria-hidden size={14} />
+                                    Upload
+                                </Button>
+                            }
+                        >
+                            <p className="text-muted m-0 text-sm">
+                                The header toggles this content; Upload isn&apos;t part of the
+                                toggle. Open or closed is remembered per key.
+                            </p>
+                        </CollapsibleSection>
                     </div>
                 </Section>
 

@@ -183,7 +183,11 @@ describe('content', () => {
         );
         expect(description).toHaveClass('whitespace-pre-wrap');
 
-        expect(within(dialog).getByRole('heading', { name: 'Attachments' })).toBeInTheDocument();
+        // A collapsible section: its heading holds the toggle (title + count).
+        expect(within(dialog).getByRole('region', { name: 'Attachments' })).toBeInTheDocument();
+        expect(
+            within(dialog).getByRole('button', { name: /^Attachments/, expanded: true }),
+        ).toBeInTheDocument();
         expect(within(dialog).getByTestId('attachment-count')).toHaveTextContent('2');
         expect(within(dialog).getByRole('heading', { name: 'Comments' })).toBeInTheDocument();
         expect(within(dialog).getByTestId('comment-count')).toHaveTextContent('3');
@@ -209,7 +213,11 @@ describe('content', () => {
         );
         expect(within(dialog).getByText('In progress')).toBeInTheDocument();
         expect(within(dialog).queryByText('Loading task…')).not.toBeInTheDocument();
-        expect(within(dialog).getByRole('heading', { name: 'Attachments' })).toBeInTheDocument();
+        // A collapsible section: its heading holds the toggle (title + count).
+        expect(within(dialog).getByRole('region', { name: 'Attachments' })).toBeInTheDocument();
+        expect(
+            within(dialog).getByRole('button', { name: /^Attachments/, expanded: true }),
+        ).toBeInTheDocument();
         expect(within(dialog).queryByTestId('attachment-count')).not.toBeInTheDocument();
         expect(within(dialog).queryByTestId('comment-count')).not.toBeInTheDocument();
 

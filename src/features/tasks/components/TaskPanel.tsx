@@ -95,6 +95,9 @@ export function TaskPanel({ projectId, taskId, afterDeleteUrl }: TaskPanelProps)
     );
 }
 
+/** The task panel lists this many files, newest first, then "Show N more". */
+export const TASK_PANEL_ATTACHMENT_CAP = 3;
+
 type OnDeleted = (taskId: string, alreadyDeleted: boolean) => void;
 
 function TaskDetail({
@@ -212,6 +215,8 @@ function TaskBody({
                 projectId={projectId}
                 taskId={task.id}
                 count={full ? task.attachmentCount : null}
+                sectionKey="task-attachments"
+                cap={TASK_PANEL_ATTACHMENT_CAP}
                 className="border-t-rule border-divider pt-3"
             />
             <CommentThread

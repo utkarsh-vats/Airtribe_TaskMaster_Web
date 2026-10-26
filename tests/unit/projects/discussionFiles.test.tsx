@@ -235,6 +235,22 @@ describe('Files', () => {
         expect(screen.getByTestId('attachment-count')).toHaveTextContent('1');
     });
 
+    it('a full page: every file, newest first, no "Show N more" cap', async () => {
+        mockApi('MEMBER', {
+            files: [1, 2, 3, 4, 5].map((n) => file(`a${n}`, `file-${n}.pdf`)),
+        });
+        renderTab('files');
+
+        await screen.findByText('file-5.pdf');
+        const list = screen.getByRole('list', { name: 'Files' });
+        expect(
+            within(list)
+                .getAllByRole('listitem')
+                .map((li) => li.querySelector('button')?.textContent),
+        ).toEqual(['file-1.pdf', 'file-2.pdf', 'file-3.pdf', 'file-4.pdf', 'file-5.pdf']);
+        expect(screen.queryByRole('button', { name: /^Show \d+ more$/ })).not.toBeInTheDocument();
+    });
+
     it('permissions as in the panel: a MEMBER may delete only their own file', async () => {
         mockApi('MEMBER', {
             files: [file('a1', 'theirs.pdf'), file('a2', 'mine.pdf', { id: me.id, name: me.name })],
