@@ -34,6 +34,7 @@ type TabSegment = (typeof PROJECT_TABS)[number]['segment'];
 const TAB_TITLES: Partial<Record<TabSegment, string>> = {
     discussion: 'Discussion',
     files: 'Files',
+    members: 'Members',
 };
 
 /** The tab segment of the current path ("tasks" when there isn't a known one). */
