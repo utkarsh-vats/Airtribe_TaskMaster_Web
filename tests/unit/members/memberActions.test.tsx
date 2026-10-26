@@ -19,6 +19,7 @@ import { resetRefreshForTests, startSession } from '@/lib/auth/refresh';
 import { sessionStore } from '@/lib/auth/store';
 import { queryKeys } from '@/lib/query/keys';
 
+import { emptyInvitations } from '../../msw/invitations';
 import { API_ORIGIN, server } from '../../msw/server';
 
 const nav = vi.hoisted(() => ({ push: vi.fn() }));
@@ -105,6 +106,7 @@ function mockApi(
             };
             return HttpResponse.json({ data: project });
         }),
+        emptyInvitations(),
         http.get(`${API_ORIGIN}/api/v1/projects`, () =>
             HttpResponse.json({ data: [], meta: { page: 1, limit: 100, total: 0, totalPages: 0 } }),
         ),
@@ -386,7 +388,7 @@ describe('removing', () => {
 
         await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith(MEMBER_GONE_MESSAGE));
         await vi.waitFor(() => expect(state.gets.members).toBe(2));
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     });
 
     it('500: an error toast; the dialog stays open for a retry', async () => {

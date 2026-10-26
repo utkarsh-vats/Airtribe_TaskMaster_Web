@@ -15,6 +15,7 @@ import type { Member, ProjectDetail, User } from '@/lib/api/types';
 import { resetRefreshForTests, startSession } from '@/lib/auth/refresh';
 import { sessionStore } from '@/lib/auth/store';
 
+import { emptyInvitations } from '../../msw/invitations';
 import { API_ORIGIN, server } from '../../msw/server';
 
 vi.mock('next/navigation', () => ({
@@ -79,6 +80,8 @@ function mockApi(
             HttpResponse.json({ data: [], meta: { page: 1, limit: 100, total: 0, totalPages: 0 } }),
         ),
         http.get(api('/p1/members'), respond),
+        // The Pending invitations section (10c) for this ADMIN viewer.
+        emptyInvitations(),
     );
 }
 

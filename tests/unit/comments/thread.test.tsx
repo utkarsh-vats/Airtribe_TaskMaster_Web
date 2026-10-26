@@ -193,6 +193,16 @@ describe('the list', () => {
         expect(screen.getByTestId('comment-count')).toHaveTextContent('2');
     });
 
+    it('a timestamp ahead of this clock (server skew) reads "just now", never "in 3 min"', async () => {
+        const ahead = new Date(Date.now() + 3 * 60_000).toISOString();
+        mockComments([comment({ body: 'From the future', createdAt: ahead })]);
+        renderThread();
+
+        const item = (await screen.findByText('From the future')).closest('li') as HTMLElement;
+        expect(within(item).getByText('just now').tagName).toBe('TIME');
+        expect(item).not.toHaveTextContent(/in \d+ min/);
+    });
+
     it('never renders a body as HTML', async () => {
         mockComments([comment({ body: '<b>bold</b>' })]);
         renderThread();

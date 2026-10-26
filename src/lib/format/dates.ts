@@ -50,15 +50,17 @@ export function shortDate(iso: string, now: Date = new Date()): string {
     );
 }
 
-const isYesterday = (date: Date, now: Date) => {
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    return date.toDateString() === yesterday.toDateString();
+/** Whole calendar days from `now`'s day to `date`'s (local time): 1 = tomorrow, -1 = yesterday. */
+const calendarDays = (date: Date, now: Date) => {
+    const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+    return Math.round((day(date) - day(now)) / (24 * HOUR));
 };
 
 /**
- * "just now" (under a minute, or in the future), "5 min ago", "2 h ago" (under a day),
- * "Yesterday" (the previous calendar day), then shortDate().
+ * For past events (comments, files, "Sent"): "just now" (under a minute), "5 min ago", "2 h
+ * ago" (under a day), "Yesterday" (the previous calendar day), then shortDate(). Any future
+ * instant is "just now": the server's clock may run ahead of the viewer's, and a past event
+ * must never read "in 2 min". For deadlines, use timeUntil().
  */
 export function relativeTime(iso: string, now: Date = new Date()): string {
     const date = new Date(iso);
@@ -67,7 +69,25 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
     if (elapsed < MINUTE) return 'just now';
     if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)} min ago`;
     if (elapsed < 24 * HOUR) return `${Math.floor(elapsed / HOUR)} h ago`;
-    if (isYesterday(date, now)) return 'Yesterday';
+    if (calendarDays(date, now) === -1) return 'Yesterday';
+    return shortDate(iso, now);
+}
+
+/**
+ * For future instants (an invitation's expiry): "in 5 min", "in 3 h" (under a day),
+ * "Tomorrow", "in 5 days" (within a week), then shortDate(). Under a minute away — or already
+ * past — is "in under a minute": whether it has lapsed ("Expired") is the caller's call.
+ */
+export function timeUntil(iso: string, now: Date = new Date()): string {
+    const date = new Date(iso);
+    const ahead = date.getTime() - now.getTime();
+    if (Number.isNaN(ahead)) return '';
+    if (ahead < MINUTE) return 'in under a minute';
+    if (ahead < HOUR) return `in ${Math.floor(ahead / MINUTE)} min`;
+    if (ahead < 24 * HOUR) return `in ${Math.floor(ahead / HOUR)} h`;
+    const days = calendarDays(date, now);
+    if (days === 1) return 'Tomorrow';
+    if (days < 7) return `in ${days} days`;
     return shortDate(iso, now);
 }
 

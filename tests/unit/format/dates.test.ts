@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDay, relativeTime, shortDate } from '@/lib/format/dates';
+import { formatDay, relativeTime, shortDate, timeUntil } from '@/lib/format/dates';
 
 import { inTimeZone } from '../../timeZone';
 
@@ -34,8 +34,48 @@ describe('relativeTime', () => {
         expect(relativeTime(new Date(2025, 9, 18, 12, 0).toISOString(), NOW)).toBe('Oct 18, 2025');
     });
 
+    it('clamps any future instant to "just now" (the server clock may be ahead)', () => {
+        for (const ms of [1_000, 5 * MIN, 3 * HOUR, 3 * 24 * HOUR]) {
+            expect(relativeTime(new Date(NOW.getTime() + ms).toISOString(), NOW)).toBe('just now');
+        }
+    });
+
     it('returns an empty string for an invalid date', () => {
         expect(relativeTime('not a date', NOW)).toBe('');
+    });
+});
+
+describe('timeUntil (e.g. an expiry)', () => {
+    const ahead = (ms: number) => new Date(NOW.getTime() + ms).toISOString();
+    const at = (month: number, day: number, hour = 12) =>
+        new Date(2026, month, day, hour, 0).toISOString();
+
+    it.each([
+        ['in under a minute', ahead(30_000)],
+        ['in under a minute', ago(HOUR)], // already past: the caller says "Expired"
+        ['in 1 min', ahead(MIN)],
+        ['in 5 min', ahead(5 * MIN + 20_000)],
+        ['in 59 min', ahead(59 * MIN + 59_000)],
+        ['in 1 h', ahead(HOUR)],
+        ['in 3 h', ahead(3 * HOUR + 10 * MIN)],
+        ['in 23 h', ahead(23 * HOUR)], // tomorrow 14:30, but under a day
+        ['Tomorrow', at(9, 22, 18)], // 26.5 h ahead
+        ['in 2 days', at(9, 23, 9)],
+        ['in 5 days', at(9, 26)],
+        ['in 6 days', at(9, 27, 23)],
+        ['Oct 28', at(9, 28)], // a week ahead: the date
+        ['Jan 3, 2027', new Date(2027, 0, 3, 12).toISOString()],
+    ])('%s', (expected, iso) => {
+        expect(timeUntil(iso, NOW)).toBe(expected);
+    });
+
+    it('counts calendar days across a month end', () => {
+        const lateOct = new Date(2026, 9, 30, 22, 0);
+        expect(timeUntil(new Date(2026, 10, 1, 8, 0).toISOString(), lateOct)).toBe('in 2 days');
+    });
+
+    it('returns an empty string for an invalid date', () => {
+        expect(timeUntil('not a date', NOW)).toBe('');
     });
 });
 

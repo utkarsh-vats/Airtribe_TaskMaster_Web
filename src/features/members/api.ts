@@ -138,7 +138,7 @@ const projectKeys = (projectId: string) => [
     queryKeys.comments.all(projectId),
     queryKeys.attachments.all(projectId),
     queryKeys.members.list(projectId),
-    [...queryKeys.invitations.all(), 'project', projectId],
+    queryKeys.invitations.projectAll(projectId),
 ];
 
 /**

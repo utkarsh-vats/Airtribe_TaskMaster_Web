@@ -16,6 +16,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
 import { Table, TableSkeleton, TBody, Td, Th, THead, Tr } from '@/components/ui/Table';
 import { RoleTag } from '@/components/ui/Tag';
+import { InviteSection } from '@/features/invitations/components/InviteForm';
+import { ProjectInvitationsSection } from '@/features/invitations/components/ProjectInvitations';
 import { useProjectContext } from '@/features/projects/ProjectContext';
 import { errorMessage } from '@/lib/api/messages';
 import type { Member } from '@/lib/api/types';
@@ -34,16 +36,18 @@ import {
 export const OWNER_LEAVE_HINT = 'Transfer ownership before leaving.';
 
 /**
- * The project's Members tab (DESIGN.md §4, §6; prototype Members tab): sections stacked like
- * the prototype — "Invite people" goes above and "Pending invitations" below in 10c, each
- * after a 2px rule. For now, the Members section.
+ * The project's Members tab (DESIGN.md §4, §6; prototype Members tab): "Invite people",
+ * "Members" and "Pending invitations" (ADMIN+), stacked like the prototype, each after the
+ * first behind a 2px rule.
  */
 export function MembersView() {
     const { project } = useProjectContext();
 
     return (
         <div className="flex max-w-[960px] flex-col gap-8 [&>section+section]:border-t-rule [&>section+section]:border-divider [&>section+section]:pt-6">
+            <InviteSection />
             <MembersSection projectId={project.id} />
+            <ProjectInvitationsSection />
         </div>
     );
 }

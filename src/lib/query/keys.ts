@@ -108,13 +108,11 @@ export const queryKeys = {
 
     invitations: {
         all: () => ['invitations'] as const,
+        /** Every invitation list of one project (all statuses). */
+        projectAll: (projectId: string) =>
+            [...queryKeys.invitations.all(), 'project', projectId] as const,
         project: (projectId: string, filters?: InvitationListFilters) =>
-            [
-                ...queryKeys.invitations.all(),
-                'project',
-                projectId,
-                normalizeFilters(filters),
-            ] as const,
+            [...queryKeys.invitations.projectAll(projectId), normalizeFilters(filters)] as const,
         mine: () => [...queryKeys.invitations.all(), 'mine'] as const,
     },
 
