@@ -18,6 +18,7 @@ import { resetRefreshForTests, startSession } from '@/lib/auth/refresh';
 import { sessionStore } from '@/lib/auth/store';
 
 import { FakeXhr, installFakeXhr } from '../../fakeXhr';
+import { commentsList } from '../../msw/comments';
 import { API_ORIGIN, server } from '../../msw/server';
 
 const nav = vi.hoisted(() => ({ pathname: '/dashboard/projects/p1/discussion' }));
@@ -57,10 +58,12 @@ const comment = (id: string, author: { id: string; name: string }, body: string)
     projectId: 'p1',
     taskId: null,
     authorId: author.id,
+    parentId: null,
     body,
     editedAt: null,
     createdAt: hourAgo(),
     author,
+    replyCount: 0,
 });
 const priya = { id: 'u2', name: 'Priya Raman' };
 
@@ -86,10 +89,8 @@ function mockApi(role: ProjectRole, { comments = [] as Comment[], files = [] as 
     server.use(
         http.get(api('/p1'), () => HttpResponse.json({ data: project(role) })),
         http.get(`${API_ORIGIN}/api/v1/projects`, () => page([])),
-        http.get(api('/p1/comments'), ({ request }) => {
-            searches.comments.push(new URL(request.url).searchParams);
-            return page(comments);
-        }),
+        // Filtered and ordered like the API (top-level, newest first when asked).
+        commentsList(comments, searches.comments),
         http.get(api('/p1/attachments'), ({ request }) => {
             searches.files.push(new URL(request.url).searchParams);
             return page(files);
@@ -131,7 +132,11 @@ describe('Discussion', () => {
 
         expect(await screen.findByText('Kickoff notes')).toBeInTheDocument();
         expect(searches.comments[0]?.get('taskId')).toBe('none');
-        expect(screen.getByRole('heading', { name: 'Discussion' })).toBeInTheDocument();
+        expect(searches.comments[0]?.get('parentId')).toBe('none');
+        expect(searches.comments[0]?.get('order')).toBe('desc');
+        // A collapsible section ("project-discussion"): its heading holds the toggle.
+        expect(screen.getByRole('region', { name: 'Discussion' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /^Discussion/, expanded: true })).toBeVisible();
         expect(screen.getByTestId('comment-count')).toHaveTextContent('2');
         expect(screen.getByRole('list', { name: 'Discussion' })).toBeInTheDocument();
         expect(screen.queryByRole('heading', { name: 'Comments' })).not.toBeInTheDocument();

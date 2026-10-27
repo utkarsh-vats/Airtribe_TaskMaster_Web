@@ -1,5 +1,6 @@
 'use client';
 
+import { clsx } from 'clsx';
 import { MoreHorizontal } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 
@@ -35,9 +36,12 @@ export function CommentItem({
     canDelete,
     editing,
     onEditingChange,
+    pending = false,
 }: {
     projectId: string;
     comment: Comment;
+    /** Being posted: shown dimmed, without actions, until the server has it. */
+    pending?: boolean;
     canEdit: boolean;
     canDelete: boolean;
     /** The thread allows one comment in edit mode at a time. */
@@ -81,7 +85,10 @@ export function CommentItem({
     };
 
     return (
-        <li className="tm-comment grid grid-cols-[28px_1fr] gap-3">
+        <li
+            className={clsx('tm-comment grid grid-cols-[28px_1fr] gap-3', pending && 'opacity-60')}
+            aria-busy={pending || undefined}
+        >
             <Avatar name={comment.author.name} size="sm" />
             <div className="min-w-0">
                 <div className="flex min-h-[28px] items-center gap-1 text-[13px]">

@@ -1,16 +1,19 @@
 /*
- * Comment threads (9a): the list (oldest first, paged with Load more), its states, and the
- * composer. Most tests render CommentThread alone; posting from a task also goes through the
- * task panel, whose comment count comes from the task detail.
+ * Comment threads: top-level comments newest first (parentId=none&order=desc), shown in
+ * batches with See more / Show less, the composer above them, posting (optimistic, at the
+ * top), the states, and the collapsible section. Most tests render CommentThread alone;
+ * posting from a task also goes through the task panel. The MSW list (tests/msw/comments.ts)
+ * filters and orders like the API, so the order on screen proves the query.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { toast } from 'sonner';
 import type * as Sonner from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { resetSectionsForTests, sectionStorageKey } from '@/components/ui/CollapsibleSection';
 import { TooltipProvider } from '@/components/ui/Tooltip';
 import { commentThreadKey } from '@/features/comments/api';
 import { TASK_GONE_MESSAGE } from '@/features/comments/components/CommentComposer';
@@ -26,6 +29,7 @@ import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { queryKeys } from '@/lib/query/keys';
 
 import { emptyAttachments } from '../../msw/attachments';
+import { commentsList } from '../../msw/comments';
 import { API_ORIGIN, server } from '../../msw/server';
 import { refetchAndFail } from '../../refetch';
 
@@ -64,38 +68,24 @@ const comment = (overrides: Partial<Comment> = {}): Comment => {
         taskId: 't1',
         authorId: 'u2',
         body: `Comment ${seq}`,
+        parentId: null,
         editedAt: null,
         createdAt: hoursAgo(1),
         author: { id: 'u2', name: 'Priya Raman' },
+        replyCount: 0,
         ...overrides,
     };
 };
 
-type Request = { search: URLSearchParams };
-
 /**
- * GET comments from `thread` (50 a page, like the API), POST appends to it. Records the
- * requests; `postResponse` overrides the POST.
+ * GET comments from `thread` (filtered, ordered and paged like the API — tests/msw/comments.ts);
+ * POST adds to it. Records the requests; `postResponse` overrides the POST.
  */
 function mockComments(thread: Comment[], postResponse?: () => Response | Promise<Response>) {
-    const gets: Request[] = [];
+    const gets: URLSearchParams[] = [];
     const posts: Record<string, unknown>[] = [];
     server.use(
-        http.get(commentsUrl, ({ request }) => {
-            const search = new URL(request.url).searchParams;
-            gets.push({ search });
-            const page = Number(search.get('page') ?? 1);
-            const limit = Number(search.get('limit') ?? 50);
-            return HttpResponse.json({
-                data: thread.slice((page - 1) * limit, page * limit),
-                meta: {
-                    page,
-                    limit,
-                    total: thread.length,
-                    totalPages: Math.ceil(thread.length / limit),
-                },
-            });
-        }),
+        commentsList(thread, gets),
         http.post(commentsUrl, async ({ request }) => {
             const body = (await request.json()) as { body: string; taskId?: string };
             posts.push(body);
@@ -155,6 +145,7 @@ const items = () => within(screen.getByRole('list', { name: 'Comments' })).getAl
 
 beforeEach(() => {
     seq = 0;
+    resetSectionsForTests();
     sessionStore.reset();
     resetRefreshForTests();
     startSession({ accessToken: 'at', expiresIn: 900, user });
@@ -167,7 +158,7 @@ afterEach(() => {
 });
 
 describe('the list', () => {
-    it('oldest first: author, relative time (full date in the title), edited, line breaks', async () => {
+    it('newest first: author, relative time (full date in the title), edited, line breaks', async () => {
         mockComments([
             comment({ body: 'First line\nSecond line', createdAt: hoursAgo(3) }),
             comment({
@@ -180,19 +171,46 @@ describe('the list', () => {
         renderThread();
 
         await screen.findByText('Fixed the typo');
-        const [first, second] = items();
-        expect(within(first as HTMLElement).getByText('Priya Raman')).toBeInTheDocument();
-        const time = within(first as HTMLElement).getByText('3 h ago');
+        const [newer, older] = items();
+        expect(within(newer as HTMLElement).getByText('Jonas Weber')).toBeInTheDocument();
+        expect(within(newer as HTMLElement).getByText('· edited')).toBeInTheDocument();
+
+        expect(within(older as HTMLElement).getByText('Priya Raman')).toBeInTheDocument();
+        const time = within(older as HTMLElement).getByText('3 h ago');
         expect(time.tagName).toBe('TIME');
         expect(time.getAttribute('title')).toMatch(/\d{4} at /);
-        const body = within(first as HTMLElement).getByText(/First line/);
+        const body = within(older as HTMLElement).getByText(/First line/);
         expect(body.textContent).toBe('First line\nSecond line');
         expect(body).toHaveClass('whitespace-pre-wrap');
-        expect(within(first as HTMLElement).queryByText(/edited/)).not.toBeInTheDocument();
-
-        expect(within(second as HTMLElement).getByText('Jonas Weber')).toBeInTheDocument();
-        expect(within(second as HTMLElement).getByText('· edited')).toBeInTheDocument();
+        expect(within(older as HTMLElement).queryByText(/edited/)).not.toBeInTheDocument();
         expect(screen.getByTestId('comment-count')).toHaveTextContent('2');
+    });
+
+    it('asks for top-level comments, newest first; replies never show as comments', async () => {
+        const { gets } = mockComments([
+            comment({ id: 'c-top', body: 'A top-level comment', replyCount: 1 }),
+            comment({ id: 'c-reply', body: 'A reply to it', parentId: 'c-top' }),
+        ]);
+        renderThread();
+
+        await screen.findByText('A top-level comment');
+        expect(gets[0]?.get('parentId')).toBe('none');
+        expect(gets[0]?.get('order')).toBe('desc');
+        expect(gets[0]?.get('taskId')).toBe('t1');
+        expect(gets[0]?.get('limit')).toBe('50');
+        expect(screen.queryByText('A reply to it')).not.toBeInTheDocument();
+        expect(items()).toHaveLength(1);
+        expect(screen.getByTestId('comment-count')).toHaveTextContent('1');
+    });
+
+    it('the composer comes first, above the comments', async () => {
+        mockComments([comment({ body: 'Hello' })]);
+        renderThread();
+
+        const list = await screen.findByRole('list', { name: 'Comments' });
+        expect(
+            composer().compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
     });
 
     it('a timestamp ahead of this clock (server skew) reads "just now", never "in 3 min"', async () => {
@@ -234,21 +252,81 @@ describe('the list', () => {
         expect(await screen.findByText('<b>bold</b>')).toBeInTheDocument();
     });
 
-    it('Load more fetches page 2 and appends it at the bottom', async () => {
-        const thread = Array.from({ length: 51 }, () => comment());
+    it('a task’s thread: 3 at first; See more reveals 3 more, fetching page 2 only once the 50 loaded run out; Show less', async () => {
+        // Comment 1 is the oldest, Comment 51 the newest.
+        const thread = Array.from({ length: 51 }, (_, i) =>
+            comment({ createdAt: new Date(Date.now() - (51 - i) * 60_000).toISOString() }),
+        );
         const { gets } = mockComments(thread);
         const u = renderThread();
-        await screen.findByText('Comment 50');
-        expect(items()).toHaveLength(50);
-
-        await u.click(screen.getByRole('button', { name: 'Load more' }));
-
         await screen.findByText('Comment 51');
+
+        expect(items().map((li) => li.querySelector('p')?.textContent)).toEqual([
+            'Comment 51',
+            'Comment 50',
+            'Comment 49',
+        ]);
+        expect(screen.queryByRole('button', { name: 'Show less' })).not.toBeInTheDocument();
+
+        await u.click(screen.getByRole('button', { name: 'See more' }));
+        expect(items()).toHaveLength(6);
+        // 15 clicks: 48 shown, all from the first page.
+        for (let i = 0; i < 14; i += 1) {
+            await u.click(screen.getByRole('button', { name: 'See more' }));
+        }
+        expect(items()).toHaveLength(48);
+        expect(gets.map((g) => g.get('page'))).toEqual(['1']);
+
+        // 51 wanted, 50 loaded: now page 2 (the oldest) is fetched.
+        await u.click(screen.getByRole('button', { name: 'See more' }));
+        await screen.findByText('Comment 1');
+        expect(gets.map((g) => g.get('page'))).toEqual(['1', '2']);
+        expect(gets[1]?.get('order')).toBe('desc');
         expect(items()).toHaveLength(51);
-        expect(items().at(-1)).toHaveTextContent('Comment 51');
-        expect(gets.map((g) => g.search.get('page'))).toEqual(['1', '2']);
-        expect(gets[0]?.search.get('limit')).toBe('50');
-        expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+        expect(items().at(-1)).toHaveTextContent('Comment 1');
+        expect(screen.queryByRole('button', { name: 'See more' })).not.toBeInTheDocument();
+
+        await u.click(screen.getByRole('button', { name: 'Show less' }));
+        expect(items()).toHaveLength(3);
+        expect(items()[0]).toHaveTextContent('Comment 51');
+        expect(screen.getByRole('button', { name: 'See more' })).toBeInTheDocument();
+    });
+
+    it('the project’s thread (Discussion): 10 at first', async () => {
+        const thread = Array.from({ length: 12 }, (_, i) =>
+            comment({
+                taskId: null,
+                createdAt: new Date(Date.now() - (12 - i) * 60_000).toISOString(),
+            }),
+        );
+        const { gets } = mockComments(thread);
+        const u = renderThread(null);
+        await screen.findByText('Comment 12');
+
+        expect(items()).toHaveLength(10);
+        await u.click(screen.getByRole('button', { name: 'See more' }));
+        expect(items()).toHaveLength(12);
+        // Everything was on the first page: nothing more to fetch.
+        expect(gets).toHaveLength(1);
+        expect(screen.queryByRole('button', { name: 'See more' })).not.toBeInTheDocument();
+    });
+
+    it('the section collapses, and stays collapsed when it comes back', async () => {
+        mockComments([comment({ body: 'Hello' })]);
+        const u = renderThread();
+        await screen.findByText('Hello');
+        const header = () => screen.getByRole('button', { name: /^Comments/ });
+
+        await u.click(header());
+        expect(header()).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.getByText('Hello')).not.toBeVisible();
+        expect(screen.getByRole('textbox', { name: 'Comment', hidden: true })).not.toBeVisible();
+
+        cleanup();
+        renderThread();
+        await screen.findByText('Hello');
+        expect(header()).toHaveAttribute('aria-expanded', 'false');
+        expect(localStorage.getItem(sectionStorageKey('task-comments'))).toBe('false');
     });
 
     it('empty', async () => {
@@ -324,7 +402,81 @@ describe('the composer', () => {
         expect(posts).toHaveLength(0);
     });
 
-    it('a failure keeps the draft and toasts the error', async () => {
+    it('posting shows the comment at once at the top (count +1); it stays there through See more / Show less', async () => {
+        const thread = Array.from({ length: 5 }, (_, i) =>
+            comment({ createdAt: new Date(Date.now() - (5 - i) * 60_000).toISOString() }),
+        );
+        let release = () => {};
+        const held = new Promise<void>((resolve) => (release = resolve));
+        const { posts } = mockComments(thread);
+        server.use(
+            http.post(commentsUrl, async ({ request }) => {
+                const body = (await request.json()) as { body: string; taskId?: string };
+                posts.push(body);
+                await held;
+                const created = comment({
+                    id: 'c-new',
+                    body: body.body,
+                    authorId: user.id,
+                    author: { id: user.id, name: user.name },
+                    createdAt: new Date().toISOString(),
+                });
+                thread.push(created);
+                return HttpResponse.json({ data: created }, { status: 201 });
+            }),
+        );
+        const u = renderThread();
+        await screen.findByText('Comment 5');
+        expect(screen.getByTestId('comment-count')).toHaveTextContent('5');
+
+        await u.type(composer(), 'Just posted');
+        await u.click(postButton());
+
+        // Before the server answers: at the top, dimmed, no actions; the box is cleared.
+        const pending = items()[0] as HTMLElement;
+        expect(pending).toHaveTextContent('Just posted');
+        expect(pending).toHaveAttribute('aria-busy', 'true');
+        expect(within(pending).queryByRole('button', { name: 'Comment actions' })).toBeNull();
+        expect(screen.getByTestId('comment-count')).toHaveTextContent('6');
+        expect(composer()).toHaveValue('');
+        expect(items()).toHaveLength(3);
+
+        release();
+        await vi.waitFor(() => expect(items()[0]).not.toHaveAttribute('aria-busy'));
+        expect(items()[0]).toHaveTextContent('Just posted');
+        expect(screen.getByTestId('comment-count')).toHaveTextContent('6');
+        expect(posts).toEqual([{ body: 'Just posted', taskId: 't1' }]);
+
+        await u.click(screen.getByRole('button', { name: 'See more' }));
+        await u.click(screen.getByRole('button', { name: 'Show less' }));
+        expect(items()[0]).toHaveTextContent('Just posted');
+        expect(screen.getByText('Just posted')).toBeVisible();
+    });
+
+    it('a failure takes the comment back out of the top, keeps the draft and toasts the error', async () => {
+        let fail = () => {};
+        const failed = new Promise<void>((resolve) => (fail = resolve));
+        mockComments([comment({ body: 'Older one' })], async () => {
+            await failed;
+            return apiError(500, 'INTERNAL_ERROR');
+        });
+        const u = renderThread();
+        await screen.findByText('Older one');
+
+        await u.type(composer(), 'Keep me');
+        await u.click(postButton());
+        expect(items()[0]).toHaveTextContent('Keep me');
+        expect(screen.getByTestId('comment-count')).toHaveTextContent('2');
+
+        fail();
+        await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
+        await vi.waitFor(() => expect(items()).toHaveLength(1));
+        expect(items()[0]).toHaveTextContent('Older one');
+        expect(screen.getByTestId('comment-count')).toHaveTextContent('1');
+        expect(composer()).toHaveValue('Keep me');
+    });
+
+    it('a failure with nothing else in the thread leaves it empty again', async () => {
         mockComments([], () => apiError(500, 'INTERNAL_ERROR'));
         const u = renderThread();
         await screen.findByText('No comments yet.');
@@ -333,8 +485,8 @@ describe('the composer', () => {
         await u.click(postButton());
 
         await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
+        await vi.waitFor(() => expect(screen.getByText('No comments yet.')).toBeInTheDocument());
         expect(composer()).toHaveValue('Keep me');
-        expect(screen.getByText('No comments yet.')).toBeInTheDocument();
     });
 
     it('422: the message under the composer', async () => {
@@ -362,7 +514,8 @@ describe('the composer', () => {
         await u.click(postButton());
 
         await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith(TASK_GONE_MESSAGE));
-        expect(composer()).toHaveValue('Anyone there?');
+        // The text comes back with the re-render after the failure.
+        await vi.waitFor(() => expect(composer()).toHaveValue('Anyone there?'));
     });
 });
 
@@ -371,7 +524,8 @@ describe('project-level thread', () => {
         const { gets, posts } = mockComments([]);
         const u = renderThread(null);
         await screen.findByText('No comments yet.');
-        expect(gets[0]?.search.get('taskId')).toBe('none');
+        expect(gets[0]?.get('taskId')).toBe('none');
+        expect(gets[0]?.get('parentId')).toBe('none');
 
         await u.type(composer(), 'Kick-off notes');
         await u.click(postButton());

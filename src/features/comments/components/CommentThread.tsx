@@ -1,9 +1,9 @@
 'use client';
 
-import { clsx } from 'clsx';
 import { useId, useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
+import { CollapsibleSection } from '@/components/ui/CollapsibleSection';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useProject } from '@/features/projects/api';
@@ -12,21 +12,26 @@ import { errorMessage } from '@/lib/api/messages';
 import { useSession } from '@/lib/auth/SessionProvider';
 import { queryView } from '@/lib/query/view';
 
-import { useComments } from '../api';
+import { commentKey, isPendingComment, useComments } from '../api';
 import { CommentComposer } from './CommentComposer';
 import { CommentItem } from './CommentItem';
 
+/** How many comments show at first, and how many more each "See more" reveals. */
+export const TASK_COMMENTS_BATCH = 3;
+export const DISCUSSION_BATCH = 10;
+
 /**
- * A comment thread (DESIGN.md §6) for a task, or the project-level one (`taskId` null): "Comments"
- * + count, the comments oldest first with "Load more" for the next page, then the composer —
- * any member can comment. Used by the task panel and the project's Discussion tab (heading,
- * empty text and placeholder of its own).
+ * A comment thread (DESIGN.md §6) for a task, or the project-level one (`taskId` null) — the
+ * project's Discussion tab, with a heading, empty text and placeholder of its own. A
+ * collapsible section ("task-comments" / "project-discussion") with the top-level comments'
+ * total; the composer first (any member can comment), then the comments newest first: a batch
+ * (3 for a task, 10 for the project), "See more" for the next — fetching the next, older, page
+ * only once the loaded ones run out — and "Show less" back to the first batch.
  */
 export function CommentThread({
     projectId,
     taskId,
     heading = 'Comments',
-    count,
     emptyText = 'No comments yet.',
     placeholder,
     className,
@@ -35,11 +40,6 @@ export function CommentThread({
     taskId: string | null;
     /** The section's heading ("Discussion" on the project's tab). */
     heading?: string;
-    /**
-     * The count to show: the task's commentCount (null while it isn't known yet, e.g. the panel is
-     * still showing the list row), or the thread's own total when omitted.
-     */
-    count?: number | null;
     /** Shown when there are no comments. */
     emptyText?: string;
     /** The composer's placeholder (default "Write a comment"). */
@@ -48,6 +48,9 @@ export function CommentThread({
 }) {
     const thread = useComments(projectId, taskId ?? 'none');
     const headingId = useId();
+    const batch = taskId ? TASK_COMMENTS_BATCH : DISCUSSION_BATCH;
+    // How many show; kept across posts, edits and deletes.
+    const [visibleCount, setVisibleCount] = useState(batch);
     // From the cached project + the signed-in user, like the task panel (works outside
     // ProjectContext). No actions until both are known.
     const project = useProject(projectId);
@@ -55,7 +58,8 @@ export function CommentThread({
     const can = project.data && user ? bindPermissions(project.data.myRole, user.id) : null;
     // One comment in edit mode at a time.
     const [editingId, setEditingId] = useState<string | null>(null);
-    const shown = count === undefined ? thread.data?.pages[0]?.meta.total : count;
+    // Top-level comments, as the API counts them (the cache keeps it right on post / delete).
+    const total = thread.data?.pages[0]?.meta.total;
 
     let body;
     const view = queryView(thread);
@@ -85,36 +89,67 @@ export function CommentThread({
             />
         );
     } else {
+        // Newest first: a comment just posted is the first one, so it's always shown.
         const comments = view.data.pages.flatMap((page) => page.items);
+        const visible = comments.slice(0, visibleCount);
+        const more = comments.length > visibleCount || thread.hasNextPage;
+
+        const seeMore = () => {
+            const next = visibleCount + batch;
+            setVisibleCount(next);
+            // Only when the loaded ones run out.
+            if (comments.length < next && thread.hasNextPage) void thread.fetchNextPage();
+        };
+
         body = comments.length ? (
             <>
                 <ol aria-labelledby={headingId} className="m-0 flex list-none flex-col gap-3 p-0">
-                    {comments.map((comment) => (
-                        <CommentItem
-                            key={comment.id}
-                            projectId={projectId}
-                            comment={comment}
-                            canEdit={can?.editComment(comment) ?? false}
-                            canDelete={can?.deleteComment(comment) ?? false}
-                            editing={editingId === comment.id}
-                            onEditingChange={(editing) =>
-                                setEditingId((current) =>
-                                    editing ? comment.id : current === comment.id ? null : current,
-                                )
-                            }
-                        />
-                    ))}
+                    {visible.map((comment) => {
+                        const pending = isPendingComment(comment);
+                        return (
+                            <CommentItem
+                                key={commentKey(comment)}
+                                projectId={projectId}
+                                comment={comment}
+                                pending={pending}
+                                canEdit={!pending && (can?.editComment(comment) ?? false)}
+                                canDelete={!pending && (can?.deleteComment(comment) ?? false)}
+                                editing={editingId === comment.id}
+                                onEditingChange={(editing) =>
+                                    setEditingId((current) =>
+                                        editing
+                                            ? comment.id
+                                            : current === comment.id
+                                              ? null
+                                              : current,
+                                    )
+                                }
+                            />
+                        );
+                    })}
                 </ol>
-                {thread.hasNextPage && (
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        className="self-start"
-                        loading={thread.isFetchingNextPage}
-                        onClick={() => void thread.fetchNextPage()}
-                    >
-                        Load more
-                    </Button>
+                {(more || visibleCount > batch) && (
+                    <div className="flex gap-2">
+                        {more && (
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                loading={thread.isFetchingNextPage}
+                                onClick={seeMore}
+                            >
+                                See more
+                            </Button>
+                        )}
+                        {visibleCount > batch && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setVisibleCount(batch)}
+                            >
+                                Show less
+                            </Button>
+                        )}
+                    </div>
                 )}
             </>
         ) : (
@@ -123,19 +158,15 @@ export function CommentThread({
     }
 
     return (
-        <section aria-labelledby={headingId} className={clsx('flex flex-col gap-3', className)}>
-            <div className="flex items-baseline gap-2">
-                <h5 id={headingId} className="m-0">
-                    {heading}
-                </h5>
-                {shown != null && (
-                    <span className="text-muted text-[12px]" data-testid="comment-count">
-                        {shown}
-                    </span>
-                )}
-            </div>
-            {body}
+        <CollapsibleSection
+            sectionKey={taskId ? 'task-comments' : 'project-discussion'}
+            title={heading}
+            titleId={headingId}
+            count={total != null ? <span data-testid="comment-count">{total}</span> : undefined}
+            className={className}
+        >
             <CommentComposer projectId={projectId} taskId={taskId} placeholder={placeholder} />
-        </section>
+            {body}
+        </CollapsibleSection>
     );
 }

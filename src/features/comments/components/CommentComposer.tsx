@@ -15,9 +15,10 @@ export const COMMENT_MAX_LENGTH = 5000;
 export const TASK_GONE_MESSAGE = 'This task no longer exists.';
 
 /**
- * "Write a comment" + Post (prototype). Ctrl/Cmd+Enter posts too. The body is trimmed and must
- * be 1–5000 characters. Success clears the draft; a failure keeps it: a 422 shows under the
- * composer, a 404 (the task was deleted) toasts, anything else toasts the error.
+ * "Write a comment" + Post (prototype), above the thread. Ctrl/Cmd+Enter posts too. The body is
+ * trimmed and must be 1–5000 characters. Posting clears the box (the comment shows at once at
+ * the top); a failure puts the text back: a 422 shows under the composer, a 404 (the task was
+ * deleted) toasts, anything else toasts the error.
  */
 export function CommentComposer({
     projectId,
@@ -43,11 +44,13 @@ export function CommentComposer({
             return;
         }
         setError(null);
+        setDraft('');
         create.mutate(
             { body, taskId },
             {
-                onSuccess: () => setDraft(''),
                 onError: (failure) => {
+                    // Back in the box — unless something new was typed meanwhile.
+                    setDraft((current) => (current === '' ? body : current));
                     if (isApiError(failure) && failure.status === 422) {
                         setError(failure.details?.[0]?.message ?? failure.message);
                     } else if (isApiError(failure) && failure.status === 404) {

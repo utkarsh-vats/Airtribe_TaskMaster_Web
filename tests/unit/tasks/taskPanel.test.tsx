@@ -14,14 +14,14 @@ import { bindPermissions } from '@/features/projects/permissions';
 import { ProjectContext } from '@/features/projects/ProjectContext';
 import { TaskListView } from '@/features/tasks/components/TaskListView';
 import { resetTaskPanelHistoryForTests } from '@/features/tasks/panelHistory';
-import type { ProjectDetail, Task, TaskListItem, User } from '@/lib/api/types';
+import type { Comment, ProjectDetail, Task, TaskListItem, User } from '@/lib/api/types';
 import { resetRefreshForTests, startSession } from '@/lib/auth/refresh';
 import { sessionStore } from '@/lib/auth/store';
 import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { queryKeys } from '@/lib/query/keys';
 
 import { emptyAttachments } from '../../msw/attachments';
-import { emptyComments } from '../../msw/comments';
+import { commentsList, emptyComments } from '../../msw/comments';
 import { API_ORIGIN, server } from '../../msw/server';
 
 const PATH = '/dashboard/projects/p1/tasks';
@@ -73,6 +73,21 @@ const row: TaskListItem = {
     assignee: { id: 'u1', name: 'Mara Okafor' },
     createdBy: { id: 'u2', name: 'Priya Raman' },
 };
+
+/** Three top-level comments on t1 (the thread's total; the detail's commentCount says 3 too). */
+const threeComments = (): Comment[] =>
+    [1, 2, 3].map((n) => ({
+        id: `c${n}`,
+        projectId: 'p1',
+        taskId: 't1',
+        authorId: 'u2',
+        parentId: null,
+        body: `Comment ${n}`,
+        editedAt: null,
+        createdAt: new Date(Date.now() - n * 3_600_000).toISOString(),
+        author: { id: 'u2', name: 'Priya Raman' },
+        replyCount: 0,
+    }));
 
 const detail = (overrides: Partial<Task> = {}): Task => ({
     ...row,
@@ -161,6 +176,7 @@ afterEach(() => {
 describe('content', () => {
     it('shows the task from ?task: title, fields, description, counts and created-by', async () => {
         mockList();
+        server.use(commentsList(threeComments()));
         mockDetail(() => HttpResponse.json({ data: detail() }));
         renderAt('task=t1');
 
@@ -189,14 +205,16 @@ describe('content', () => {
             within(dialog).getByRole('button', { name: /^Attachments/, expanded: true }),
         ).toBeInTheDocument();
         expect(within(dialog).getByTestId('attachment-count')).toHaveTextContent('2');
-        expect(within(dialog).getByRole('heading', { name: 'Comments' })).toBeInTheDocument();
-        expect(within(dialog).getByTestId('comment-count')).toHaveTextContent('3');
+        expect(within(dialog).getByRole('region', { name: 'Comments' })).toBeInTheDocument();
+        // The thread's own total of top-level comments.
+        expect(await within(dialog).findByTestId('comment-count')).toHaveTextContent('3');
         expect(within(dialog).queryByText('Coming soon')).not.toBeInTheDocument();
         expect(within(dialog).getByText('Created by Priya Raman · 2 h ago')).toBeInTheDocument();
     });
 
     it('shows the list row at once while the detail is still loading', async () => {
         mockList();
+        server.use(commentsList(threeComments()));
         mockDetail(async () => {
             await delay(300);
             return HttpResponse.json({ data: detail() });
@@ -219,10 +237,11 @@ describe('content', () => {
             within(dialog).getByRole('button', { name: /^Attachments/, expanded: true }),
         ).toBeInTheDocument();
         expect(within(dialog).queryByTestId('attachment-count')).not.toBeInTheDocument();
-        expect(within(dialog).queryByTestId('comment-count')).not.toBeInTheDocument();
+        // The comment count is the thread's own total: it doesn't wait for the detail.
+        expect(await within(dialog).findByTestId('comment-count')).toHaveTextContent('3');
+        expect(within(dialog).queryByTestId('attachment-count')).not.toBeInTheDocument();
 
         expect(await within(dialog).findByTestId('attachment-count')).toHaveTextContent('2');
-        expect(within(dialog).getByTestId('comment-count')).toHaveTextContent('3');
     });
 
     it('shows skeleton lines when there is nothing cached', async () => {

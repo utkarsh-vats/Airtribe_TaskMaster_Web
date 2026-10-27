@@ -471,13 +471,15 @@ export interface paths {
         };
         /**
          * List comments
-         * @description Any member. Oldest first.
+         * @description Any member. Oldest first by default; order=desc for newest first. parentId=none → top-level comments only; parentId=<id> → that comment's replies.
          */
         get: operations["listComments"];
         put?: never;
         /**
-         * Comment on the project or one of its tasks
+         * Comment on the project or one of its tasks, or reply to a comment
          * @description Any member. A `taskId` that isn't in this project → 404.
+         *
+         *     **Replies** (`parentId`): one level only, so replying to a reply → 422. A reply inherits the parent's `taskId`; an explicit `taskId` that differs from the parent's → 422. A parent that is missing or in another project → 404.
          */
         post: operations["createComment"];
         delete?: never;
@@ -504,7 +506,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a comment
-         * @description Author or ADMIN+.
+         * @description Author or ADMIN+. Deleting a top-level comment also deletes its replies.
          */
         delete: operations["deleteComment"];
         options?: never;
@@ -514,6 +516,31 @@ export interface paths {
          * @description Author only (not even the OWNER). Sets `editedAt`. Checks: 404 → 403 → 422.
          */
         patch: operations["updateComment"];
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/comments/{commentId}/replies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id */
+                projectId: string;
+                /** @description Top-level comment id */
+                commentId: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * List a comment's replies
+         * @description Any member. Oldest first by default; order=desc for newest first. A comment that is missing or in another project → 404; a comment that is itself a reply → 422 on `commentId`. Unknown query params → 422.
+         */
+        get: operations["listCommentReplies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/projects/{projectId}/attachments": {
@@ -741,7 +768,7 @@ export interface components {
         /** @enum {string} */
         TaskPriority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
         /** @enum {string} */
-        NotificationType: "TASK_ASSIGNED" | "TASK_UPDATED" | "TASK_COMPLETED" | "COMMENT_ADDED" | "PROJECT_INVITATION";
+        NotificationType: "TASK_ASSIGNED" | "TASK_UPDATED" | "TASK_COMPLETED" | "COMMENT_ADDED" | "PROJECT_INVITATION" | "COMMENT_REPLY";
         Health: {
             data: {
                 /** @enum {string} */
@@ -954,11 +981,15 @@ export interface components {
             taskId: string | null;
             /** Format: uuid */
             authorId: string;
+            /** @description The comment this replies to; null for a top-level comment. */
+            parentId: string | null;
             body: string;
             editedAt: string | null;
             /** Format: date-time */
             createdAt: string;
             author: components["schemas"]["UserSummary"];
+            /** @description Direct replies to this comment; always 0 for a reply. */
+            replyCount: number;
         };
         CommentDetail: {
             /** Format: uuid */
@@ -969,11 +1000,15 @@ export interface components {
             taskId: string | null;
             /** Format: uuid */
             authorId: string;
+            /** @description The comment this replies to; null for a top-level comment. */
+            parentId: string | null;
             body: string;
             editedAt: string | null;
             /** Format: date-time */
             createdAt: string;
             author: components["schemas"]["UserSummary"];
+            /** @description Direct replies to this comment; always 0 for a reply. */
+            replyCount: number;
             task: {
                 /** Format: uuid */
                 id: string;
@@ -2075,6 +2110,10 @@ export interface operations {
                 limit?: number;
                 /** @description A task id for that task only (404 if the task isn't in this project), or `none` for project-level items only. Omit for all. */
                 taskId?: string | "none";
+                /** @description `none` for top-level comments only, or a comment id for that comment's replies. Omit for all. */
+                parentId?: string | "none";
+                /** @description `asc` (default) for oldest first, `desc` for newest first. */
+                order?: "asc" | "desc";
             };
             header?: never;
             path: {
@@ -2117,6 +2156,8 @@ export interface operations {
                 "application/json": {
                     body: string;
                     taskId?: string | null;
+                    /** @description Reply to this top-level comment. The reply takes the parent's `taskId`; null or omitted for a top-level comment. */
+                    parentId?: string | null;
                 };
             };
         };
@@ -2227,6 +2268,44 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    listCommentReplies: {
+        parameters: {
+            query?: {
+                /** @description Page number, from 1. */
+                page?: number;
+                /** @description Items per page, 1–100. */
+                limit?: number;
+                /** @description `asc` (default) for oldest first, `desc` for newest first. */
+                order?: "asc" | "desc";
+            };
+            header?: never;
+            path: {
+                /** @description Project id */
+                projectId: string;
+                /** @description Top-level comment id */
+                commentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of replies */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Comment"][];
+                        meta: components["schemas"]["PageMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };

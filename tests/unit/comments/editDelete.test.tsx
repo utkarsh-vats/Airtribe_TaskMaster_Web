@@ -32,6 +32,7 @@ import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { queryKeys } from '@/lib/query/keys';
 
 import { emptyAttachments } from '../../msw/attachments';
+import { commentsList } from '../../msw/comments';
 import { API_ORIGIN, server } from '../../msw/server';
 
 const nav = vi.hoisted(() => ({ search: '' }));
@@ -74,10 +75,12 @@ const comment = (id: string, authorId: string, name: string, body: string): Comm
     projectId: 'p1',
     taskId: 't1',
     authorId,
+    parentId: null,
     body,
     editedAt: null,
     createdAt: new Date(Date.now() - 3_600_000).toISOString(),
     author: { id: authorId, name },
+    replyCount: 0,
 });
 
 const mine = () => comment('c1', me.id, me.name, 'My first take');
@@ -108,12 +111,8 @@ function mockApi(
         http.get(`${API_ORIGIN}/api/v1/projects/p1`, () =>
             HttpResponse.json({ data: project(role) }),
         ),
-        http.get(commentsUrl, () =>
-            HttpResponse.json({
-                data: thread,
-                meta: { page: 1, limit: 50, total: thread.length, totalPages: 1 },
-            }),
-        ),
+        // Filtered and ordered like the API (top-level, newest first when asked).
+        commentsList(thread),
         http.patch(`${commentsUrl}/:id`, async ({ params, request }) => {
             const body = (await request.json()) as { body: string };
             calls.patches.push(body);
@@ -361,6 +360,32 @@ describe('deleting', () => {
         expect(dialog).toHaveTextContent("This can't be undone.");
         return { u, dialog };
     }
+
+    it('deleting keeps the thread expanded (See more stays revealed)', async () => {
+        // Five of mine, Comment 1 the oldest; a task's thread shows 3 at first.
+        const thread = [1, 2, 3, 4, 5].map((n) => ({
+            ...comment(`c${n}`, me.id, me.name, `Note ${n}`),
+            createdAt: new Date(Date.now() - (6 - n) * 60_000).toISOString(),
+        }));
+        const calls = mockApi('MEMBER', thread);
+        const u = renderThread();
+        await screen.findByText('Note 5');
+        await u.click(screen.getByRole('button', { name: 'See more' }));
+        expect(screen.getByText('Note 1')).toBeInTheDocument();
+
+        await vi.waitFor(() => expect(actions('Note 2')).toBeInTheDocument());
+        await openMenu(u, 'Note 2');
+        await u.click(screen.getByRole('menuitem', { name: 'Delete' }));
+        const dialog = await screen.findByRole('dialog', { name: 'Delete this comment?' });
+        await u.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+        await vi.waitFor(() => expect(screen.queryByText('Note 2')).not.toBeInTheDocument());
+        expect(calls.deletes).toEqual(['c2']);
+        // Still expanded: the other four, and Show less.
+        for (const n of [1, 3, 4, 5]) expect(screen.getByText(`Note ${n}`)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Show less' })).toBeInTheDocument();
+        expect(screen.getByTestId('comment-count')).toHaveTextContent('4');
+    });
 
     it('cancel sends nothing', async () => {
         const calls = mockApi('MEMBER', [mine()]);

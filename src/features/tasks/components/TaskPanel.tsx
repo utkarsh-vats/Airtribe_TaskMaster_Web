@@ -222,7 +222,6 @@ function TaskBody({
             <CommentThread
                 projectId={projectId}
                 taskId={task.id}
-                count={full ? task.commentCount : null}
                 className="border-t-rule border-divider pt-3"
             />
 
