@@ -20,6 +20,8 @@ export type ProjectListFilters = QueryOf<'/api/v1/projects'>;
 export type TaskListFilters = QueryOf<'/api/v1/projects/{projectId}/tasks'>;
 export type MyTaskFilters = QueryOf<'/api/v1/users/me/tasks'>;
 export type CommentListFilters = Omit<QueryOf<'/api/v1/projects/{projectId}/comments'>, 'taskId'>;
+export type CommentReplyFilters =
+    QueryOf<'/api/v1/projects/{projectId}/comments/{commentId}/replies'>;
 export type AttachmentListFilters = Omit<
     QueryOf<'/api/v1/projects/{projectId}/attachments'>,
     'taskId'
@@ -84,6 +86,14 @@ export const queryKeys = {
                 ...queryKeys.comments.all(projectId),
                 'list',
                 taskId,
+                normalizeFilters(filters),
+            ] as const,
+        /** One top-level comment's replies. */
+        replies: (projectId: string, commentId: string, filters?: CommentReplyFilters) =>
+            [
+                ...queryKeys.comments.all(projectId),
+                'replies',
+                commentId,
                 normalizeFilters(filters),
             ] as const,
     },

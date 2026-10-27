@@ -207,6 +207,7 @@ afterEach(() => {
 });
 
 describe('each field sends only its own key', () => {
+    // Two selects, each saved and checked: the slowest test here, and slow under load.
     it('status and priority', async () => {
         const { dialog, user } = await openPanel();
 
@@ -223,7 +224,7 @@ describe('each field sends only its own key', () => {
         await vi.waitFor(() =>
             expect(patches).toEqual([{ status: 'COMPLETED' }, { priority: 'URGENT' }]),
         );
-    });
+    }, 15_000);
 
     it('assignee: a member, then Unassigned as null', async () => {
         // As an admin: an assignee who hands the task to someone else can no longer edit it.

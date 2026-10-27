@@ -307,6 +307,11 @@ a.btn-ghost:hover {
     font-weight: 800;
     line-height: 1;
 }
+.avatar-xs {
+    width: 20px;
+    height: 20px;
+    font-size: 9px;
+}
 .avatar-sm {
     width: 24px;
     height: 24px;

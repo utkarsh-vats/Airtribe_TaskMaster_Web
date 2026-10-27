@@ -2,7 +2,7 @@
 
 import { clsx } from 'clsx';
 import { MoreHorizontal } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -37,9 +37,15 @@ export function CommentItem({
     editing,
     onEditingChange,
     pending = false,
+    variant = 'comment',
+    children,
 }: {
     projectId: string;
     comment: Comment;
+    /** A reply: indented by its list, with a smaller avatar. */
+    variant?: 'comment' | 'reply';
+    /** Under the body: a top-level comment's Reply / replies. */
+    children?: ReactNode;
     /** Being posted: shown dimmed, without actions, until the server has it. */
     pending?: boolean;
     canEdit: boolean;
@@ -86,10 +92,14 @@ export function CommentItem({
 
     return (
         <li
-            className={clsx('tm-comment grid grid-cols-[28px_1fr] gap-3', pending && 'opacity-60')}
+            className={clsx(
+                'tm-comment grid gap-3',
+                variant === 'reply' ? 'grid-cols-[20px_1fr]' : 'grid-cols-[28px_1fr]',
+                pending && 'opacity-60',
+            )}
             aria-busy={pending || undefined}
         >
-            <Avatar name={comment.author.name} size="sm" />
+            <Avatar name={comment.author.name} size={variant === 'reply' ? 'xs' : 'sm'} />
             <div className="min-w-0">
                 <div className="flex min-h-[28px] items-center gap-1 text-[13px]">
                     <span className="min-w-0">
@@ -155,13 +165,25 @@ export function CommentItem({
                     // Plain text: line breaks kept, never rendered as HTML.
                     <p className="m-0 text-sm break-words whitespace-pre-wrap">{comment.body}</p>
                 )}
+                {children}
             </div>
             {canDelete && (
                 <ConfirmDialog
                     open={confirmOpen}
                     onOpenChange={setConfirmOpen}
-                    title="Delete this comment?"
-                    description="This can't be undone."
+                    title={variant === 'reply' ? 'Delete this reply?' : 'Delete this comment?'}
+                    description={
+                        <>
+                            {comment.replyCount > 0 && (
+                                // Deleting a top-level comment deletes its replies (API).
+                                <span className="block">
+                                    This also deletes {comment.replyCount}{' '}
+                                    {comment.replyCount === 1 ? 'reply' : 'replies'}.
+                                </span>
+                            )}
+                            <span className="block">This can&apos;t be undone.</span>
+                        </>
+                    }
                     confirmLabel="Delete"
                     destructive
                     // Rejects on failure (already toasted), which keeps the dialog open to retry.

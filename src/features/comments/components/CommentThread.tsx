@@ -15,6 +15,7 @@ import { queryView } from '@/lib/query/view';
 import { commentKey, isPendingComment, useComments } from '../api';
 import { CommentComposer } from './CommentComposer';
 import { CommentItem } from './CommentItem';
+import { CommentReplies } from './CommentReplies';
 
 /** How many comments show at first, and how many more each "See more" reveals. */
 export const TASK_COMMENTS_BATCH = 3;
@@ -56,8 +57,11 @@ export function CommentThread({
     const project = useProject(projectId);
     const { user } = useSession();
     const can = project.data && user ? bindPermissions(project.data.myRole, user.id) : null;
-    // One comment in edit mode at a time.
+    // One comment or reply in edit mode at a time, and one reply composer open.
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [replyingTo, setReplyingTo] = useState<string | null>(null);
+    const setEditing = (commentId: string, editing: boolean) =>
+        setEditingId((current) => (editing ? commentId : current === commentId ? null : current));
     // Top-level comments, as the API counts them (the cache keeps it right on post / delete).
     const total = thread.data?.pages[0]?.meta.total;
 
@@ -115,16 +119,26 @@ export function CommentThread({
                                 canEdit={!pending && (can?.editComment(comment) ?? false)}
                                 canDelete={!pending && (can?.deleteComment(comment) ?? false)}
                                 editing={editingId === comment.id}
-                                onEditingChange={(editing) =>
-                                    setEditingId((current) =>
-                                        editing
-                                            ? comment.id
-                                            : current === comment.id
-                                              ? null
-                                              : current,
-                                    )
-                                }
-                            />
+                                onEditingChange={(editing) => setEditing(comment.id, editing)}
+                            >
+                                <CommentReplies
+                                    projectId={projectId}
+                                    parent={comment}
+                                    can={can}
+                                    replying={replyingTo === comment.id}
+                                    onReplyingChange={(replying) =>
+                                        setReplyingTo((current) =>
+                                            replying
+                                                ? comment.id
+                                                : current === comment.id
+                                                  ? null
+                                                  : current,
+                                        )
+                                    }
+                                    editingId={editingId}
+                                    onEditingChange={setEditing}
+                                />
+                            </CommentItem>
                         );
                     })}
                 </ol>

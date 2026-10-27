@@ -58,3 +58,43 @@ export function commentsList(store: Comment[], gets: URLSearchParams[] = [], pro
         });
     });
 }
+
+/**
+ * GET /comments/:commentId/replies over `store`, the way the API does it: that comment's
+ * replies, `order` asc (the default, oldest first) or desc, paged by `page` / `limit`; 404 when
+ * the comment isn't in `store`. Each request's query is pushed to `gets`.
+ */
+export function repliesList(store: Comment[], gets: URLSearchParams[] = [], projectId = 'p1') {
+    return http.get(`${url(projectId)}/:commentId/replies`, ({ params, request }) => {
+        const search = new URL(request.url).searchParams;
+        gets.push(search);
+        const commentId = String(params.commentId);
+        if (!store.some((c) => c.id === commentId)) {
+            return HttpResponse.json(
+                { error: { code: 'NOT_FOUND', message: 'Not found', requestId: 'r' } },
+                { status: 404 },
+            );
+        }
+        const page = Number(search.get('page') ?? 1);
+        const limit = Number(search.get('limit') ?? 50);
+        const replies = store
+            .map((comment, index) => ({ comment, index }))
+            .filter(({ comment }) => comment.parentId === commentId)
+            .sort(
+                (a, b) =>
+                    Date.parse(a.comment.createdAt) - Date.parse(b.comment.createdAt) ||
+                    a.index - b.index,
+            )
+            .map(({ comment }) => comment);
+        if (search.get('order') === 'desc') replies.reverse();
+        return HttpResponse.json({
+            data: replies.slice((page - 1) * limit, page * limit),
+            meta: {
+                page,
+                limit,
+                total: replies.length,
+                totalPages: Math.ceil(replies.length / limit),
+            },
+        });
+    });
+}

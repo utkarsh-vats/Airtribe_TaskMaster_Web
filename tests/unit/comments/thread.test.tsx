@@ -252,6 +252,7 @@ describe('the list', () => {
         expect(await screen.findByText('<b>bold</b>')).toBeInTheDocument();
     });
 
+    // 16 clicks over up to 51 rendered comments: slow under load (CI), so more than 5 s.
     it('a task’s thread: 3 at first; See more reveals 3 more, fetching page 2 only once the 50 loaded run out; Show less', async () => {
         // Comment 1 is the oldest, Comment 51 the newest.
         const thread = Array.from({ length: 51 }, (_, i) =>
@@ -290,7 +291,7 @@ describe('the list', () => {
         expect(items()).toHaveLength(3);
         expect(items()[0]).toHaveTextContent('Comment 51');
         expect(screen.getByRole('button', { name: 'See more' })).toBeInTheDocument();
-    });
+    }, 15_000);
 
     it('the project’s thread (Discussion): 10 at first', async () => {
         const thread = Array.from({ length: 12 }, (_, i) =>

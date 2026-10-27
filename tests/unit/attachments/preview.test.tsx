@@ -70,6 +70,21 @@ function mockApi(
 ) {
     const downloads: Download[] = [];
     server.use(
+        // The list reads the project for its delete buttons (none here: no file is mine).
+        http.get(`${API_ORIGIN}/api/v1/projects/p1`, () =>
+            HttpResponse.json({
+                data: {
+                    id: 'p1',
+                    name: 'Website relaunch',
+                    description: null,
+                    createdAt: '2026-10-01T09:00:00.000Z',
+                    updatedAt: '2026-10-01T09:00:00.000Z',
+                    myRole: 'MEMBER',
+                    memberCount: 2,
+                    owner: null,
+                },
+            }),
+        ),
         http.get(listUrl, () =>
             HttpResponse.json({
                 data: files,
