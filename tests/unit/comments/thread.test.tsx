@@ -434,6 +434,8 @@ describe('the composer', () => {
         await u.click(postButton());
 
         // Before the server answers: at the top, dimmed, no actions; the box is cleared.
+        // The optimistic row renders with the cache update, just after the click.
+        await vi.waitFor(() => expect(items()[0]).toHaveTextContent('Just posted'));
         const pending = items()[0] as HTMLElement;
         expect(pending).toHaveTextContent('Just posted');
         expect(pending).toHaveAttribute('aria-busy', 'true');
@@ -466,7 +468,8 @@ describe('the composer', () => {
 
         await u.type(composer(), 'Keep me');
         await u.click(postButton());
-        expect(items()[0]).toHaveTextContent('Keep me');
+        // The optimistic row renders with the cache update, just after the click.
+        await vi.waitFor(() => expect(items()[0]).toHaveTextContent('Keep me'));
         expect(screen.getByTestId('comment-count')).toHaveTextContent('2');
 
         fail();
@@ -474,7 +477,8 @@ describe('the composer', () => {
         await vi.waitFor(() => expect(items()).toHaveLength(1));
         expect(items()[0]).toHaveTextContent('Older one');
         expect(screen.getByTestId('comment-count')).toHaveTextContent('1');
-        expect(composer()).toHaveValue('Keep me');
+        // The draft comes back in its own render (component state, not the cache).
+        await vi.waitFor(() => expect(composer()).toHaveValue('Keep me'));
     });
 
     it('a failure with nothing else in the thread leaves it empty again', async () => {
@@ -487,7 +491,7 @@ describe('the composer', () => {
 
         await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
         await vi.waitFor(() => expect(screen.getByText('No comments yet.')).toBeInTheDocument());
-        expect(composer()).toHaveValue('Keep me');
+        await vi.waitFor(() => expect(composer()).toHaveValue('Keep me'));
     });
 
     it('422: the message under the composer', async () => {

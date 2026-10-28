@@ -14,7 +14,7 @@ import type * as Sonner from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetSectionsForTests } from '@/components/ui/CollapsibleSection';
-import { PARENT_DELETED_MESSAGE } from '@/features/comments/api';
+import { COMMENT_ALREADY_DELETED_MESSAGE, PARENT_DELETED_MESSAGE } from '@/features/comments/api';
 import { CommentThread } from '@/features/comments/components/CommentThread';
 import type { Comment, ProjectDetail, User } from '@/lib/api/types';
 import { resetRefreshForTests, startSession } from '@/lib/auth/refresh';
@@ -327,7 +327,8 @@ describe('replying', () => {
         await u.keyboard('{Control>}{Enter}{/Control}');
 
         // Before the server answers: appended, dimmed; the box is empty; 2 replies now.
-        expect(replyTexts()).toEqual(['First reply', 'On it']);
+        // The optimistic row renders with the cache update, just after the click.
+        await vi.waitFor(() => expect(replyTexts()).toEqual(['First reply', 'On it']));
         const pending = within(repliesOf() as HTMLElement)
             .getAllByRole('listitem')
             .at(-1);
@@ -374,7 +375,8 @@ describe('replying', () => {
 
         await u.type(replyComposer(), 'Will fail');
         await u.click(screen.getByRole('button', { name: 'Post reply' }));
-        expect(replyTexts()).toEqual(['First reply', 'Will fail']);
+        // The optimistic row renders with the cache update, just after the click.
+        await vi.waitFor(() => expect(replyTexts()).toEqual(['First reply', 'Will fail']));
 
         fail();
         await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
@@ -434,6 +436,63 @@ describe('deleting', () => {
 
         await vi.waitFor(() => expect(screen.queryByText('My reply')).not.toBeInTheDocument());
         expect(calls.deletes).toEqual(['r2']);
+        expect(replyTexts()).toEqual(['Keep this']);
+        await u.click(toggleOf('Kick-off notes'));
+        expect(toggleOf('Kick-off notes')).toHaveTextContent('View 1 reply');
+    });
+
+    it('404 on a reply (someone deleted it first): gone at once, count down, "already deleted"', async () => {
+        const parent = top('c1', 'Kick-off notes');
+        const store = withReplies(parent, [
+            reply('r1', parent, 'Keep this', 30),
+            reply('r2', parent, 'My reply', 10, ME),
+        ]);
+        mockApi(store, {
+            remove: () =>
+                HttpResponse.json(
+                    { error: { code: 'NOT_FOUND', message: 'Not found', requestId: 'r' } },
+                    { status: 404 },
+                ),
+        });
+        const u = renderThread();
+        await screen.findByText('Kick-off notes');
+        await u.click(toggleOf('Kick-off notes'));
+        await vi.waitFor(() => expect(repliesOf()).toBeInTheDocument());
+
+        const mine = within(repliesOf() as HTMLElement)
+            .getByText('My reply')
+            .closest('li') as HTMLElement;
+        await u.click(within(mine).getByRole('button', { name: 'Comment actions' }));
+        await u.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+        const dialog = await screen.findByRole('dialog', { name: 'Delete this reply?' });
+
+        // It's gone on the server already (that's what the 404 says): the data reflects it.
+        store.splice(
+            store.findIndex((c) => c.id === 'r2'),
+            1,
+        );
+        (store[0] as Comment).replyCount = 1;
+        // Hold the replies refetch, to see the app remove it by itself first.
+        let release = () => {};
+        const held = new Promise<void>((resolve) => (release = resolve));
+        server.use(
+            http.get(`${commentsUrl}/c1/replies`, async () => {
+                await held;
+                return HttpResponse.json({
+                    data: [store[1]],
+                    meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+                });
+            }),
+        );
+        await u.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+        await vi.waitFor(() => expect(screen.queryByText('My reply')).not.toBeInTheDocument());
+        expect(client.isFetching()).toBeGreaterThan(0);
+        expect(toast).toHaveBeenCalledWith(COMMENT_ALREADY_DELETED_MESSAGE);
+        expect(replyTexts()).toEqual(['Keep this']);
+
+        release();
+        await vi.waitFor(() => expect(client.isFetching()).toBe(0));
         expect(replyTexts()).toEqual(['Keep this']);
         await u.click(toggleOf('Kick-off notes'));
         expect(toggleOf('Kick-off notes')).toHaveTextContent('View 1 reply');

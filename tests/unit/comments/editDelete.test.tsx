@@ -92,7 +92,12 @@ const apiError = (status: number, code: string, details?: { path: string; messag
         { status },
     );
 
-type Calls = { patches: Record<string, unknown>[]; deletes: string[] };
+type Calls = {
+    patches: Record<string, unknown>[];
+    deletes: string[];
+    /** The thread's GETs (a refetch adds one). */
+    gets: URLSearchParams[];
+};
 
 /**
  * The project (with `role`), the thread (`thread`, kept up to date by PATCH and DELETE), and
@@ -106,13 +111,13 @@ function mockApi(
         remove?: () => Response | Promise<Response>;
     } = {},
 ): Calls {
-    const calls: Calls = { patches: [], deletes: [] };
+    const calls: Calls = { patches: [], deletes: [], gets: [] };
     server.use(
         http.get(`${API_ORIGIN}/api/v1/projects/p1`, () =>
             HttpResponse.json({ data: project(role) }),
         ),
         // Filtered and ordered like the API (top-level, newest first when asked).
-        commentsList(thread),
+        commentsList(thread, calls.gets),
         http.patch(`${commentsUrl}/:id`, async ({ params, request }) => {
             const body = (await request.json()) as { body: string };
             calls.patches.push(body);
@@ -398,14 +403,39 @@ describe('deleting', () => {
     });
 
     it('404: removed anyway, with "That comment was already deleted."', async () => {
-        mockApi('ADMIN', [priyas()], { remove: () => apiError(404, 'NOT_FOUND') });
+        const thread = [priyas()];
+        mockApi('ADMIN', thread, { remove: () => apiError(404, 'NOT_FOUND') });
         const { u, dialog } = await askToDelete('Priya says hi');
+        // A 404 means someone else deleted it first: it's gone from the server too, so the
+        // refetch after the delete mustn't bring it back.
+        thread.splice(0);
+        // Hold the refetch that follows, to see the app remove it by itself first.
+        let release = () => {};
+        const held = new Promise<void>((resolve) => (release = resolve));
+        server.use(
+            http.get(commentsUrl, async () => {
+                await held;
+                return HttpResponse.json({
+                    data: [],
+                    meta: { page: 1, limit: 50, total: 0, totalPages: 0 },
+                });
+            }),
+        );
 
         await u.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
+        // Gone from the cache on the 404 itself — the refetch hasn't answered yet.
         await vi.waitFor(() => expect(screen.queryByText('Priya says hi')).not.toBeInTheDocument());
+        expect(screen.getByTestId('comment-count')).toHaveTextContent('0');
+        expect(client.isFetching()).toBeGreaterThan(0);
         expect(toast).toHaveBeenCalledWith(COMMENT_ALREADY_DELETED_MESSAGE);
         expect(toast.error).not.toHaveBeenCalled();
+
+        // And it stays gone once the refetch has answered.
+        release();
+        await vi.waitFor(() => expect(client.isFetching()).toBe(0));
+        expect(await screen.findByText('No comments yet.')).toBeInTheDocument();
+        expect(screen.queryByText('Priya says hi')).not.toBeInTheDocument();
     });
 
     it('500: the dialog stays open, with an error toast', async () => {
