@@ -14,7 +14,7 @@ import { ERROR_CODES, hasCode, isApiError } from '@/lib/api/errors';
 import { notifyError } from '@/lib/api/notify';
 import type { Task, TaskListItem, TaskPriority, TaskStatus } from '@/lib/api/types';
 import { TASK_STATUSES } from '@/lib/domain';
-import { queryKeys } from '@/lib/query/keys';
+import { type MyTaskFilters, queryKeys } from '@/lib/query/keys';
 
 import {
     moveInColumnCaches,
@@ -48,6 +48,28 @@ export function useTasks(
     return useQuery({
         queryKey: queryKeys.tasks.list(projectId, query),
         queryFn: ({ signal }) => fetchTasks(projectId, query, signal),
+        placeholderData: keepPreviousData,
+        enabled,
+    });
+}
+
+function fetchMyTasks(query: MyTaskFilters, signal: AbortSignal) {
+    return unwrapPage(
+        api.GET('/api/v1/users/me/tasks', {
+            params: { query},
+            signal,
+        }),
+    );
+}
+
+export function useMyTasks(
+    filters: TaskFilters,
+    { enabled = true }: { enabled?: boolean } = {},
+) {
+    const query = { ...toQueryParams(filters), page: filters.page, limit: TASKS_PAGE_SIZE };
+    return useQuery({
+        queryKey: queryKeys.tasks.mine(query),
+        queryFn: ({ signal }) => fetchMyTasks(query, signal),
         placeholderData: keepPreviousData,
         enabled,
     });
@@ -108,6 +130,38 @@ export function useTaskStatusCounts(
                 queryKey: queryKeys.tasks.list(projectId, query),
                 queryFn: ({ signal }: { signal: AbortSignal }) =>
                     fetchTasks(projectId, query, signal),
+                select: (page: Awaited<ReturnType<typeof fetchTasks>>) => page.meta.total,
+                enabled,
+            };
+        }),
+    });
+    return Object.fromEntries(
+        variants.map((variant, i) => [variant, results[i]?.data]),
+    ) as StatusCounts;
+}
+
+export function useMyTaskStatusCounts(
+    filters: TaskFilters,
+    { enabled = true }: { enabled?: boolean } = {},
+): StatusCounts {
+    // Every filter but status; sort/order don't change a count, so they don't split the cache.
+    const {
+        sort: _sort,
+        order: _order,
+        ...base
+    } = toQueryParams({ ...filters, status: undefined });
+    const variants: ('ALL' | TaskStatus)[] = ['ALL', ...TASK_STATUSES];
+    const results = useQueries({
+        queries: variants.map((variant) => {
+            const query = {
+                ...base,
+                ...(variant === 'ALL' ? {} : { status: [variant] }),
+                limit: 1,
+            };
+            return {
+                queryKey: queryKeys.tasks.mine(query),
+                queryFn: ({ signal }: { signal: AbortSignal }) =>
+                    fetchMyTasks(query, signal),
                 select: (page: Awaited<ReturnType<typeof fetchTasks>>) => page.meta.total,
                 enabled,
             };

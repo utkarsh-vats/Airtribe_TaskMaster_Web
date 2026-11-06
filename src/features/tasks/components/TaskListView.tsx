@@ -99,7 +99,7 @@ export function TaskListView() {
     );
 }
 
-function TaskListBody() {
+export function TaskListBody() {
     const { project } = useProjectContext();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -355,7 +355,7 @@ function TaskListBody() {
 }
 
 /** All · To do · In progress · Done with counts ("–" while loading). */
-function StatusFilter({
+export function StatusFilter({
     status,
     counts,
     onChange,
@@ -398,7 +398,15 @@ function DueCell({ task, className }: { task: TaskListItem; className?: string }
     );
 }
 
-function TaskTable({ items, onOpen }: { items: TaskListItem[]; onOpen: (taskId: string) => void }) {
+export function TaskTable({
+    items,
+    onOpen,
+    projectNames,
+}: { 
+    items: TaskListItem[];
+    onOpen: (taskId: string) => void;
+    projectNames?: ReadonlyMap<string, string>;
+}) {
     return (
         <Table minWidth={720} aria-label="Tasks">
             <THead>
@@ -406,7 +414,7 @@ function TaskTable({ items, onOpen }: { items: TaskListItem[]; onOpen: (taskId: 
                     <Th>Task</Th>
                     <Th className="w-[130px]">Status</Th>
                     <Th className="w-[110px]">Priority</Th>
-                    <Th className="w-[170px]">Assignee</Th>
+                    {projectNames ? <Th className="w-[170px]">Project</Th> : <Th className="w-[170px]">Assignee</Th>}
                     <Th className="w-[140px]">Due</Th>
                 </tr>
             </THead>
@@ -430,7 +438,11 @@ function TaskTable({ items, onOpen }: { items: TaskListItem[]; onOpen: (taskId: 
                                 <PriorityMark priority={task.priority} />
                             </Td>
                             <Td>
-                                {task.assignee ? (
+                                {projectNames ? (
+                                    <span className='block truncate text-[13px]'>
+                                        {projectNames.get(task.projectId) ?? <span className="text-muted">—</span>}
+                                    </span>
+                                ) : task.assignee ? (
                                     <span className="flex min-w-0 items-center gap-[6px] text-[13px]">
                                         <Avatar name={task.assignee.name} size="sm" />
                                         <span className="truncate">{task.assignee.name}</span>
@@ -450,14 +462,16 @@ function TaskTable({ items, onOpen }: { items: TaskListItem[]; onOpen: (taskId: 
     );
 }
 
-function TaskRows({
+export function TaskRows({
     items,
     href,
     onOpen,
+    projectNames,
 }: {
     items: TaskListItem[];
     href: (taskId: string) => string;
     onOpen: (taskId: string) => void;
+    projectNames?: ReadonlyMap<string, string>;
 }) {
     return (
         <ul aria-label="Tasks" className="m-0 list-none border-t-rule border-divider p-0">
@@ -491,7 +505,11 @@ function TaskRows({
                                 <StatusTag status={task.status} />
                                 <span className="flex items-center gap-2 text-xs">
                                     <DueCell task={task} />
-                                    {task.assignee ? (
+                                    {projectNames ? (
+                                        <span className='block truncate text-[13px]'>
+                                            {projectNames.get(task.projectId) ?? <span className="text-muted">—</span>}
+                                        </span>
+                                    ) : task.assignee ? (
                                         <Avatar name={task.assignee.name} size="sm" />
                                     ) : (
                                         <span className="sr-only">Unassigned</span>
