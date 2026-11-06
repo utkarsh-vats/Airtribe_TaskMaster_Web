@@ -402,7 +402,7 @@ export function TaskTable({
     items,
     onOpen,
     projectNames,
-}: { 
+}: {
     items: TaskListItem[];
     onOpen: (taskId: string) => void;
     projectNames?: ReadonlyMap<string, string>;
@@ -414,7 +414,11 @@ export function TaskTable({
                     <Th>Task</Th>
                     <Th className="w-[130px]">Status</Th>
                     <Th className="w-[110px]">Priority</Th>
-                    {projectNames ? <Th className="w-[170px]">Project</Th> : <Th className="w-[170px]">Assignee</Th>}
+                    {projectNames ? (
+                        <Th className="w-[170px]">Project</Th>
+                    ) : (
+                        <Th className="w-[170px]">Assignee</Th>
+                    )}
                     <Th className="w-[140px]">Due</Th>
                 </tr>
             </THead>
@@ -439,8 +443,10 @@ export function TaskTable({
                             </Td>
                             <Td>
                                 {projectNames ? (
-                                    <span className='block truncate text-[13px]'>
-                                        {projectNames.get(task.projectId) ?? <span className="text-muted">—</span>}
+                                    <span className="block truncate text-[13px]">
+                                        {projectNames.get(task.projectId) ?? (
+                                            <span className="text-muted">—</span>
+                                        )}
                                     </span>
                                 ) : task.assignee ? (
                                     <span className="flex min-w-0 items-center gap-[6px] text-[13px]">
@@ -506,8 +512,10 @@ export function TaskRows({
                                 <span className="flex items-center gap-2 text-xs">
                                     <DueCell task={task} />
                                     {projectNames ? (
-                                        <span className='block truncate text-[13px]'>
-                                            {projectNames.get(task.projectId) ?? <span className="text-muted">—</span>}
+                                        <span className="block truncate text-[13px]">
+                                            {projectNames.get(task.projectId) ?? (
+                                                <span className="text-muted">—</span>
+                                            )}
                                         </span>
                                     ) : task.assignee ? (
                                         <Avatar name={task.assignee.name} size="sm" />

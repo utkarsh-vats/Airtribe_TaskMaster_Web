@@ -56,16 +56,13 @@ export function useTasks(
 function fetchMyTasks(query: MyTaskFilters, signal: AbortSignal) {
     return unwrapPage(
         api.GET('/api/v1/users/me/tasks', {
-            params: { query},
+            params: { query },
             signal,
         }),
     );
 }
 
-export function useMyTasks(
-    filters: TaskFilters,
-    { enabled = true }: { enabled?: boolean } = {},
-) {
+export function useMyTasks(filters: TaskFilters, { enabled = true }: { enabled?: boolean } = {}) {
     const query = { ...toQueryParams(filters), page: filters.page, limit: TASKS_PAGE_SIZE };
     return useQuery({
         queryKey: queryKeys.tasks.mine(query),
@@ -160,8 +157,7 @@ export function useMyTaskStatusCounts(
             };
             return {
                 queryKey: queryKeys.tasks.mine(query),
-                queryFn: ({ signal }: { signal: AbortSignal }) =>
-                    fetchMyTasks(query, signal),
+                queryFn: ({ signal }: { signal: AbortSignal }) => fetchMyTasks(query, signal),
                 select: (page: Awaited<ReturnType<typeof fetchTasks>>) => page.meta.total,
                 enabled,
             };

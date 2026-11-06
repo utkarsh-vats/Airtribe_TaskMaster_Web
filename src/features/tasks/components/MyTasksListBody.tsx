@@ -205,10 +205,15 @@ export function MyTasksListBody() {
                 className={clsx('transition-opacity', dimmed && 'opacity-60')}
             >
                 <div className="hidden md:block" data-testid="task-table">
-                    <TaskTable items={items} onOpen={openTask} projectNames={projectNames}/>
+                    <TaskTable items={items} onOpen={openTask} projectNames={projectNames} />
                 </div>
                 <div className="md:hidden" data-testid="task-rows">
-                    <TaskRows items={items} href={taskHref} onOpen={openTask} projectNames={projectNames} />
+                    <TaskRows
+                        items={items}
+                        href={taskHref}
+                        onOpen={openTask}
+                        projectNames={projectNames}
+                    />
                 </div>
             </div>
             <Pagination
