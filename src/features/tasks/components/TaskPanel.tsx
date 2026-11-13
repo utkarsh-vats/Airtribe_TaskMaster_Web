@@ -93,7 +93,14 @@ export function TaskPanel({ projectId, taskId, afterDeleteUrl, closeUrl }: TaskP
             title={breadcrumb}
             returnFocusTo={returnFocus}
         >
-            {shownId && <TaskDetail projectId={projectId} taskId={shownId} onDeleted={onDeleted} urlWithoutTask={urlWithoutTask} />}
+            {shownId && (
+                <TaskDetail
+                    projectId={projectId}
+                    taskId={shownId}
+                    onDeleted={onDeleted}
+                    urlWithoutTask={urlWithoutTask}
+                />
+            )}
         </Sheet>
     );
 }
@@ -125,9 +132,7 @@ function TaskDetail({
                 title="Task not found"
                 body="It may have been deleted."
                 action={
-                    <Button onClick={() => closeTaskPanel(taskId, urlWithoutTask)}>
-                        Close
-                    </Button>
+                    <Button onClick={() => closeTaskPanel(taskId, urlWithoutTask)}>Close</Button>
                 }
             />
         );
