@@ -282,7 +282,7 @@ describe('ProjectContext', () => {
         }
         const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
         expect(() => render(<Orphan />)).toThrow(
-            'useProjectContext must be used inside ProjectShell',
+            'useProjectContext must be used inside a ProjectContext provider',
         );
         spy.mockRestore();
     });

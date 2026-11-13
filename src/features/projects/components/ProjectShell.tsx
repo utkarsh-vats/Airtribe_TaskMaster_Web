@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useMemo, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
 import { ButtonLink } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -14,12 +14,10 @@ import { RoleTag } from '@/components/ui/Tag';
 import { isNotFound } from '@/lib/api/errors';
 import { errorMessage } from '@/lib/api/messages';
 import type { ProjectDetail } from '@/lib/api/types';
-import { useSession } from '@/lib/auth/SessionProvider';
 import { queryView } from '@/lib/query/view';
 
 import { useProject, useProjects } from '../api';
-import { bindPermissions } from '../permissions';
-import { ProjectContext, type ProjectContextValue } from '../ProjectContext';
+import { ProjectContext, useBoundProjectContext } from '../ProjectContext';
 
 export const PROJECT_TABS = [
     { segment: 'tasks', label: 'Tasks' },
@@ -71,19 +69,15 @@ export function ProjectShell({ projectId, children }: { projectId: string; child
     return <LoadedProject project={view.data}>{children}</LoadedProject>;
 }
 
-function LoadedProject({ project, children }: { project: ProjectDetail; children: ReactNode }) {
-    const { user } = useSession();
-    const userId = user?.id ?? '';
+export function LoadedProject({
+    project,
+    children,
+}: {
+    project: ProjectDetail;
+    children: ReactNode;
+}) {
     const tabTitle = TAB_TITLES[currentTab(usePathname(), project.id)];
-
-    const context = useMemo<ProjectContextValue>(
-        () => ({
-            project,
-            myRole: project.myRole,
-            can: bindPermissions(project.myRole, userId),
-        }),
-        [project, userId],
-    );
+    const context = useBoundProjectContext(project);
 
     const base = `/dashboard/projects/${project.id}`;
 
@@ -154,7 +148,7 @@ function ProjectSwitcher({ current }: { current: ProjectDetail }) {
     );
 }
 
-function ProjectHeaderSkeleton() {
+export function ProjectHeaderSkeleton() {
     return (
         <div aria-busy="true" className="flex flex-col gap-3">
             <span className="sr-only">Loading project…</span>

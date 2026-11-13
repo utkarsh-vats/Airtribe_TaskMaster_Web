@@ -6,6 +6,7 @@ import {
     useQueries,
     useQuery,
     useQueryClient,
+    type QueryClient,
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -368,11 +369,7 @@ export function useUpdateTask(projectId: string, boundTaskId?: string) {
                 assignee: task.assignee ? { id: task.assignee.id, name: task.assignee.name } : null,
             });
         },
-        onSettled: () =>
-            Promise.all([
-                queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(projectId) }),
-                queryClient.invalidateQueries({ queryKey: [...queryKeys.tasks.root(), 'mine'] }),
-            ]),
+        onSettled: () => invalidateTaskQueries(queryClient, projectId),
     });
 }
 
@@ -419,8 +416,7 @@ export function useDeleteTask(projectId: string, taskId: string) {
                 });
             }
             // Not awaited: the panel closes at once and the lists catch up behind it.
-            void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(projectId) });
-            void queryClient.invalidateQueries({ queryKey: [...queryKeys.tasks.root(), 'mine'] });
+            void invalidateTaskQueries(queryClient, projectId);
         },
         onError: (error) => notifyError(error),
     });
@@ -446,8 +442,15 @@ export function useCreateTask(projectId: string) {
                 }),
             ),
         onSuccess: () => {
-            void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(projectId) });
-            void queryClient.invalidateQueries({ queryKey: [...queryKeys.tasks.root(), 'mine'] });
+            void invalidateTaskQueries(queryClient, projectId);
         },
     });
+}
+
+/** A project's tasks changed: refresh its lists, counts and details, and every My tasks query. */
+export function invalidateTaskQueries(queryClient: QueryClient, projectId: string) {
+    return Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(projectId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.tasks.mineAll() }),
+    ]);
 }

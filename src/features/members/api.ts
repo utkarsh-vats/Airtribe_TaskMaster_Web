@@ -117,6 +117,7 @@ export function leftProject(
 ) {
     router.push('/dashboard/projects');
     void queryClient.invalidateQueries({ queryKey: queryKeys.projects.lists() });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.tasks.mineAll() });
     forgetProjectWhenUnused(queryClient, projectId);
 }
 

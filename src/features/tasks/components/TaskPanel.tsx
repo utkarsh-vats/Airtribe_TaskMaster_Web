@@ -49,6 +49,8 @@ type TaskPanelProps = {
     taskId: string | null;
     /** Where to land after deleting the task (e.g. the previous page); default: just close. */
     afterDeleteUrl?: string | undefined;
+    /** Where closing goes when there's no history entry to go back to. Default: the URL without ?task. */
+    closeUrl?: string;
 };
 
 export const TASK_DELETED_MESSAGE = 'Task deleted';
@@ -57,9 +59,10 @@ export const TASK_DELETED_MESSAGE = 'Task deleted';
  * Task detail sheet (DESIGN.md §6 "Task panel"), opened by ?task=<id>: fields editable per
  * DESIGN.md §8, delete in the footer. Takes the project id explicitly so My tasks can reuse it.
  */
-export function TaskPanel({ projectId, taskId, afterDeleteUrl }: TaskPanelProps) {
+export function TaskPanel({ projectId, taskId, afterDeleteUrl, closeUrl }: TaskPanelProps) {
     const project = useProject(projectId);
     const urlWith = useUrlWith();
+    const urlWithoutTask = closeUrl ?? urlWith({ task: null });
     const breadcrumb = `${project.data?.name ?? 'Project'} / Task`;
     // Focus goes back to the row (or link) that opened the panel. Keep the last task id: by
     // the time Radix restores focus, ?task (and so `taskId`) is already gone.
@@ -76,7 +79,7 @@ export function TaskPanel({ projectId, taskId, afterDeleteUrl }: TaskPanelProps)
 
     const onDeleted = (id: string, alreadyDeleted: boolean) => {
         setDeletedId(id);
-        closeTaskPanel(id, urlWith({ task: null }), afterDeleteUrl);
+        closeTaskPanel(id, urlWithoutTask, afterDeleteUrl);
         if (alreadyDeleted) toast(TASK_ALREADY_DELETED_MESSAGE);
         else toast.success(TASK_DELETED_MESSAGE);
     };
@@ -85,12 +88,12 @@ export function TaskPanel({ projectId, taskId, afterDeleteUrl }: TaskPanelProps)
         <Sheet
             open={shownId !== null}
             onOpenChange={(open) => {
-                if (!open && taskId) closeTaskPanel(taskId, urlWith({ task: null }));
+                if (!open && taskId) closeTaskPanel(taskId, urlWithoutTask);
             }}
             title={breadcrumb}
             returnFocusTo={returnFocus}
         >
-            {shownId && <TaskDetail projectId={projectId} taskId={shownId} onDeleted={onDeleted} />}
+            {shownId && <TaskDetail projectId={projectId} taskId={shownId} onDeleted={onDeleted} urlWithoutTask={urlWithoutTask} />}
         </Sheet>
     );
 }
@@ -104,14 +107,14 @@ function TaskDetail({
     projectId,
     taskId,
     onDeleted,
+    urlWithoutTask,
 }: {
     projectId: string;
     taskId: string;
     onDeleted: OnDeleted;
+    urlWithoutTask: string;
 }) {
     const task = useTask(projectId, taskId);
-    const urlWith = useUrlWith();
-
     const view = queryView(task);
 
     // A 404 (or 422) means the task is gone — deleted by someone else, say — so it replaces
@@ -122,7 +125,7 @@ function TaskDetail({
                 title="Task not found"
                 body="It may have been deleted."
                 action={
-                    <Button onClick={() => closeTaskPanel(taskId, urlWith({ task: null }))}>
+                    <Button onClick={() => closeTaskPanel(taskId, urlWithoutTask)}>
                         Close
                     </Button>
                 }

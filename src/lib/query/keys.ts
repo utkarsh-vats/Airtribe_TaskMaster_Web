@@ -75,8 +75,9 @@ export const queryKeys = {
             [...queryKeys.tasks.lists(projectId), normalizeFilters(filters)] as const,
         detail: (projectId: string, taskId: string) =>
             [...queryKeys.tasks.all(projectId), 'detail', taskId] as const,
+        mineAll: () => [...queryKeys.tasks.root(), 'mine'] as const,
         mine: (filters?: MyTaskFilters) =>
-            [...queryKeys.tasks.root(), 'mine', normalizeFilters(filters)] as const,
+            [...queryKeys.tasks.mineAll(), normalizeFilters(filters)] as const,
     },
 
     comments: {
