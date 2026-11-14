@@ -93,7 +93,7 @@ Three areas, each with its own layout: **marketing** (`(marketing)` route group)
 | `/dashboard/projects/[projectId]/members` | Invite form, members table, invitations table | Per prototype |
 | `/dashboard/projects/[projectId]/settings` | Project details, danger zone | Per prototype |
 | `/dashboard/invitations` | Invitations sent to me — Accept / Decline | Not in prototype — styled like its lists (§9 Invitations inbox) |
-| `/dashboard/notifications` | Full notifications list | Header panel shows the latest 10 |
+| `/dashboard/notifications` | Full notifications list: All / Unread (`?unread=1`), `?page`, Mark all as read | Header panel shows the latest 10 (12b) |
 | `/dashboard/profile` | Profile, password, sign out | Per prototype, plus bio and avatar URL |
 | `/dev/ui` | Component showcase | Dev only — `notFound()` in production |
 | not found | "Project not found" / generic 404 | The API returns 404 for projects you're not in (and 422 for a malformed id): both show "Project not found" inside the dashboard shell, with a link to `/dashboard/projects` |
@@ -249,15 +249,17 @@ UI checks only hide or disable controls; the API stays the authority. `myRole` c
 
 
 - Header button with unread badge (`meta.unreadCount`); panel with the 10 newest, **Mark all read**, and "View all" → `/dashboard/notifications` (filter Unread / All, pagination).
-- Sentences from `type` + `payload` snapshot:
-  - `TASK_ASSIGNED` — "{actor} assigned you “{task}” in {project}"
-  - `TASK_COMPLETED` — "{actor} completed “{task}”"
-  - `TASK_UPDATED` — "{actor} updated {changedFields} on “{task}”"
-  - `COMMENT_ADDED` — "{actor} commented on “{task}”: {preview}"
-  - `PROJECT_INVITATION` — "{actor} invited you to {project} as {role}"
-  - `COMMENT_REPLY` — new in the API with comment replies; no notification UI handles types yet, so nothing needed a placeholder. The copy ("{actor} replied to your comment", label "Reply") comes with step 12a.
-  A null actor name renders as "Someone".
-- Clicking marks it read and navigates: task types → `/dashboard/projects/{projectId}/tasks?task={taskId}`; invitation → `/dashboard/invitations`.
+- **Notifications page** (`NotificationsView`, `/dashboard/notifications`): h2 "Notifications" + muted "{n} unread" (`meta.unreadCount`, every unread one whatever the filter), **Mark all as read** (disabled at 0), and a segmented **All | Unread** written to the URL as `?unread=1` — the API filters (`unread=true`). Newest first, 20 a page (`?page`, pagination). Rows: an unread dot (and "Unread: " in the link's name), the actor's avatar, the sentence with task / project names bold, the relative time (beside it from 820 px, under it below). The whole row is a link to the notification's target; a plain click marks it read (fire and forget) and navigates; a modified click (new tab) just follows the link, unmarked. Empty: "You're all caught up" / "No unread notifications" (Unread) / "Nothing on this page" past the end; loading: skeleton rows; error (a failed first load): ErrorState with Try again; a failed background refetch keeps the rows.
+- **Marking read is optimistic:** one (`PATCH /notifications/{id}/read`) or all (`POST /notifications/read-all`) show read at once in every cached list, and the unread count drops — in each list's `meta.unreadCount` and the header's count (`useUnreadCount`, same cache) — then the notifications refetch. A failure puts the cache back and toasts.
+- Sentences (`notificationSentence`) from `type` + the `payload` snapshot (names as they were). Each type's payload is checked with a small Zod schema; a type this client doesn't know, or a payload that doesn't fit, falls back to "{actor} updated something in {project}" (or "Something changed"), so the page never breaks on it:
+  - `TASK_ASSIGNED` — "{actor} assigned you **{task}**"
+  - `TASK_UPDATED` — "{actor} updated the {changedFields} of **{task}**" (e.g. "the status and priority"; just "updated **{task}**" without `changedFields`)
+  - `TASK_COMPLETED` — "{actor} completed **{task}**"
+  - `COMMENT_ADDED` — "{actor} commented on **{task}**: “{preview}”" (the API sends it for task comments only; without a task it would read "in **{project}**")
+  - `COMMENT_REPLY` — "{actor} replied to your comment[ on **{task}**]: “{preview}”"
+  - `PROJECT_INVITATION` — "{actor} invited you to **{project}**"
+  A null actor name (the account is gone) renders as "Someone".
+- Where a row leads: task events and task comments / replies → `/dashboard/projects/{projectId}/tasks?task={taskId}`; a project-level comment or reply → `/dashboard/projects/{projectId}/discussion`; an invitation → `/dashboard/invitations`; a fallback → the project, or this page. The notification's own `projectId` / `taskId` win over the payload's.
 - **Live:** one SSE connection per signed-in tab (`fetch-event-source`, bearer token). On `notification`: prepend to the cache, bump the badge, show a toast, and invalidate the related project's task queries so other people's changes appear. Reconnect with backoff using a fresh token; after reconnecting, refetch the list to catch anything missed.
 
 ---

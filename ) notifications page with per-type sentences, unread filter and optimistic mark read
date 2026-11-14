@@ -1,0 +1,222 @@
+[1mdiff --git a/docs/DESIGN.md b/docs/DESIGN.md[m
+[1mindex 8606a40..8149bd9 100644[m
+[1m--- a/docs/DESIGN.md[m
+[1m+++ b/docs/DESIGN.md[m
+[36m@@ -93,7 +93,7 @@[m [mThree areas, each with its own layout: **marketing** (`(marketing)` route group)[m
+ | `/dashboard/projects/[projectId]/members` | Invite form, members table, invitations table | Per prototype |[m
+ | `/dashboard/projects/[projectId]/settings` | Project details, danger zone | Per prototype |[m
+ | `/dashboard/invitations` | Invitations sent to me — Accept / Decline | Not in prototype — styled like its lists (§9 Invitations inbox) |[m
+[31m-| `/dashboard/notifications` | Full notifications list | Header panel shows the latest 10 |[m
+[32m+[m[32m| `/dashboard/notifications` | Full notifications list: All / Unread (`?unread=1`), `?page`, Mark all as read | Header panel shows the latest 10 (12b) |[m
+ | `/dashboard/profile` | Profile, password, sign out | Per prototype, plus bio and avatar URL |[m
+ | `/dev/ui` | Component showcase | Dev only — `notFound()` in production |[m
+ | not found | "Project not found" / generic 404 | The API returns 404 for projects you're not in (and 422 for a malformed id): both show "Project not found" inside the dashboard shell, with a link to `/dashboard/projects` |[m
+[36m@@ -249,15 +249,17 @@[m [mUI checks only hide or disable controls; the API stays the authority. `myRole` c[m
+ [m
+ [m
+ - Header button with unread badge (`meta.unreadCount`); panel with the 10 newest, **Mark all read**, and "View all" → `/dashboard/notifications` (filter Unread / All, pagination).[m
+[31m-- Sentences from `type` + `payload` snapshot:[m
+[31m-  - `TASK_ASSIGNED` — "{actor} assigned you “{task}” in {project}"[m
+[31m-  - `TASK_COMPLETED` — "{actor} completed “{task}”"[m
+[31m-  - `TASK_UPDATED` — "{actor} updated {changedFields} on “{task}”"[m
+[31m-  - `COMMENT_ADDED` — "{actor} commented on “{task}”: {preview}"[m
+[31m-  - `PROJECT_INVITATION` — "{actor} invited you to {project} as {role}"[m
+[31m-  - `COMMENT_REPLY` — new in the API with comment replies; no notification UI handles types yet, so nothing needed a placeholder. The copy ("{actor} replied to your comment", label "Reply") comes with step 12a.[m
+[31m-  A null actor name renders as "Someone".[m
+[31m-- Clicking marks it read and navigates: task types → `/dashboard/projects/{projectId}/tasks?task={taskId}`; invitation → `/dashboard/invitations`.[m
+[32m+[m[32m- **Notifications page** (`NotificationsView`, `/dashboard/notifications`): h2 "Notifications" + muted "{n} unread" (`meta.unreadCount`, every unread one whatever the filter), **Mark all as read** (disabled at 0), and a segmented **All | Unread** written to the URL as `?unread=1` — the API filters (`unread=true`). Newest first, 20 a page (`?page`, pagination). Rows: an unread dot (and "Unread: " in the link's name), the actor's avatar, the sentence with task / project names bold, the relative time (beside it from 820 px, under it below). The whole row is a link to the notification's target; a plain click marks it read (fire and forget) and navigates; a modified click (new tab) just follows the link, unmarked. Empty: "You're all caught up" / "No unread notifications" (Unread) / "Nothing on this page" past the end; loading: skeleton rows; error (a failed first load): ErrorState with Try again; a failed background refetch keeps the rows.[m
+[32m+[m[32m- **Marking read is optimistic:** one (`PATCH /notifications/{id}/read`) or all (`POST /notifications/read-all`) show read at once in every cached list, and the unread count drops — in each list's `meta.unreadCount` and the header's count (`useUnreadCount`, same cache) — then the notifications refetch. A failure puts the cache back and toasts.[m
+[32m+[m[32m- Sentences (`notificationSentence`) from `type` + the `payload` snapshot (names as they were). Each type's payload is checked with a small Zod schema; a type this client doesn't know, or a payload that doesn't fit, falls back to "{actor} updated something in {project}" (or "Something changed"), so the page never breaks on it:[m
+[32m+[m[32m  - `TASK_ASSIGNED` — "{actor} assigned you **{task}**"[m
+[32m+[m[32m  - `TASK_UPDATED` — "{actor} updated the {changedFields} of **{task}**" (e.g. "the status and priority"; just "updated **{task}**" without `changedFields`)[m
+[32m+[m[32m  - `TASK_COMPLETED` — "{actor} completed **{task}**"[m
+[32m+[m[32m  - `COMMENT_ADDED` — "{actor} commented on **{task}**: “{preview}”" (the API sends it for task comments only; without a task it would read "in **{project}**")[m
+[32m+[m[32m  - `COMMENT_REPLY` — "{actor} replied to your comment[ on **{task}**]: “{preview}”"[m
+[32m+[m[32m  - `PROJECT_INVITATION` — "{actor} invited you to **{project}**"[m
+[32m+[m[32m  A null actor name (the account is gone) renders as "Someone".[m
+[32m+[m[32m- Where a row leads: task events and task comments / replies → `/dashboard/projects/{projectId}/tasks?task={taskId}`; a project-level comment or reply → `/dashboard/projects/{projectId}/discussion`; an invitation → `/dashboard/invitations`; a fallback → the project, or this page. The notification's own `projectId` / `taskId` win over the payload's.[m
+ - **Live:** one SSE connection per signed-in tab (`fetch-event-source`, bearer token). On `notification`: prepend to the cache, bump the badge, show a toast, and invalidate the related project's task queries so other people's changes appear. Reconnect with backoff using a fresh token; after reconnecting, refetch the list to catch anything missed.[m
+ [m
+ ---[m
+[1mdiff --git a/src/app/dashboard/notifications/page.tsx b/src/app/dashboard/notifications/page.tsx[m
+[1mindex 4313dcf..9209bf9 100644[m
+[1m--- a/src/app/dashboard/notifications/page.tsx[m
+[1m+++ b/src/app/dashboard/notifications/page.tsx[m
+[36m@@ -1,8 +1,15 @@[m
+ import type { Metadata } from 'next';[m
+[32m+[m[32mimport { Suspense } from 'react';[m
+[32m+[m
+[32m+[m[32mimport { NotificationsView } from '@/features/notifications/components/NotificationsView';[m
+ [m
+ export const metadata: Metadata = { title: 'Notifications' };[m
+ [m
+[31m-// Placeholder — the notifications page comes in step 12a.[m
+ export default function NotificationsPage() {[m
+[31m-    return <h2 className="m-0">Notifications</h2>;[m
+[32m+[m[32m    return ([m
+[32m+[m[32m        // NotificationsView reads ?unread / ?page; useSearchParams needs a Suspense boundary.[m
+[32m+[m[32m        <Suspense>[m
+[32m+[m[32m            <NotificationsView />[m
+[32m+[m[32m        </Suspense>[m
+[32m+[m[32m    );[m
+ }[m
+[1mdiff --git a/src/features/notifications/api.ts b/src/features/notifications/api.ts[m
+[1mindex 5a66d78..fed3ddc 100644[m
+[1m--- a/src/features/notifications/api.ts[m
+[1m+++ b/src/features/notifications/api.ts[m
+[36m@@ -1,16 +1,27 @@[m
+ 'use client';[m
+ [m
+[31m-import { useQuery } from '@tanstack/react-query';[m
+[32m+[m[32mimport {[m
+[32m+[m[32m    keepPreviousData,[m
+[32m+[m[32m    useMutation,[m
+[32m+[m[32m    useQuery,[m
+[32m+[m[32m    useQueryClient,[m
+[32m+[m[32m    type QueryClient,[m
+[32m+[m[32m    type QueryKey,[m
+[32m+[m[32m} from '@tanstack/react-query';[m
+ [m
+[31m-import { api, unwrapPage } from '@/lib/api/client';[m
+[32m+[m[32mimport { api, unwrap, unwrapPage } from '@/lib/api/client';[m
+[32m+[m[32mimport { notifyError } from '@/lib/api/notify';[m
+[32m+[m[32mimport type { Notification } from '@/lib/api/types';[m
+ import { queryKeys } from '@/lib/query/keys';[m
+ [m
+ const UNREAD_POLL_MS = 60_000;[m
+[32m+[m[32mexport const NOTIFICATIONS_PAGE_SIZE = 20;[m
+ [m
+ /**[m
+  * Unread notification count for the header badge: GET /notifications?unread=true&limit=1,[m
+  * reading meta.unreadCount. Polls every 60 s while the tab is visible (TanStack pauses the[m
+[31m- * interval in background tabs); step 12c adds live updates over SSE.[m
+[32m+[m[32m * interval in background tabs); step 12c adds live updates over SSE. Marking read updates it[m
+[32m+[m[32m * in place (useMarkRead / useMarkAllRead).[m
+  */[m
+ export function useUnreadCount() {[m
+     return useQuery({[m
+[36m@@ -28,3 +39,124 @@[m [mexport function useUnreadCount() {[m
+         refetchIntervalInBackground: false,[m
+     });[m
+ }[m
+[32m+[m
+[32m+[m[32mexport type NotificationFilters = { unread: boolean; page: number };[m
+[32m+[m
+[32m+[m[32mtype NotificationPage = Awaited<ReturnType<typeof fetchNotifications>>;[m
+[32m+[m
+[32m+[m[32mfunction fetchNotifications(query: NotificationQuery, signal: AbortSignal) {[m
+[32m+[m[32m    return unwrapPage(api.GET('/api/v1/notifications', { params: { query }, signal }));[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mtype NotificationQuery = { page: number; limit: number; unread?: 'true' };[m
+[32m+[m
+[32m+[m[32mconst toQuery = ({ unread, page }: NotificationFilters): NotificationQuery => ({[m
+[32m+[m[32m    page,[m
+[32m+[m[32m    limit: NOTIFICATIONS_PAGE_SIZE,[m
+[32m+[m[32m    ...(unread ? { unread: 'true' as const } : {}),[m
+[32m+[m[32m});[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * My notifications (GET /notifications), newest first, 20 a page; `unread` for unread only (the[m
+[32m+[m[32m * API filters). meta.unreadCount counts every unread one, whatever the filter. While another[m
+[32m+[m[32m * page or filter loads, the previous result stays on screen.[m
+[32m+[m[32m */[m
+[32m+[m[32mexport function useNotifications(filters: NotificationFilters) {[m
+[32m+[m[32m    const query = toQuery(filters);[m
+[32m+[m[32m    return useQuery({[m
+[32m+[m[32m        queryKey: queryKeys.notifications.list(query),[m
+[32m+[m[32m        queryFn: ({ signal }) => fetchNotifications(query, signal),[m
+[32m+[m[32m        placeholderData: keepPreviousData,[m
+[32m+[m[32m    });[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m// ── marking read (optimistic) ────────────────────────────────────────────────────────[m
+[32m+[m
+[32m+[m[32mtype Snapshot = [QueryKey, unknown][];[m
+[32m+[m
+[32m+[m[32mconst isPage = (data: unknown): data is NotificationPage =>[m
+[32m+[m[32m    typeof data === 'object' && data !== null && 'items' in data && 'meta' in data;[m
+[32m+[m
+[32m+[m[32m/** Every cached notifications query, to put back if marking read fails. */[m
+[32m+[m[32mfunction snapshot(queryClient: QueryClient): Snapshot {[m
+[32m+[m[32m    return queryClient.getQueriesData({ queryKey: queryKeys.notifications.all() });[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction restore(queryClient: QueryClient, saved: Snapshot) {[m
+[32m+[m[32m    for (const [key, data] of saved) queryClient.setQueryData(key, data);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Mark `which` read in every cached list (and set its readAt), and take the unread count —[m
+[32m+[m[32m * each list's meta.unreadCount and the header's count — down by `fewer` (to 0 for 'all').[m
+[32m+[m[32m */[m
+[32m+[m[32mfunction markReadInCache(queryClient: QueryClient, which: { id: string } | 'all', fewer: number) {[m
+[32m+[m[32m    const now = new Date().toISOString();[m
+[32m+[m[32m    const lower = (count: number) => (which === 'all' ? 0 : Math.max(0, count - fewer));[m
+[32m+[m[32m    for (const [key, data] of queryClient.getQueriesData({[m
+[32m+[m[32m        queryKey: [...queryKeys.notifications.all(), 'list'],[m
+[32m+[m[32m    })) {[m
+[32m+[m[32m        if (!isPage(data)) continue;[m
+[32m+[m[32m        queryClient.setQueryData(key, {[m
+[32m+[m[32m            ...data,[m
+[32m+[m[32m            items: data.items.map((item) =>[m
+[32m+[m[32m                !item.readAt && (which === 'all' || item.id === which.id)[m
+[32m+[m[32m                    ? { ...item, readAt: now }[m
+[32m+[m[32m                    : item,[m
+[32m+[m[32m            ),[m
+[32m+[m[32m            meta: { ...data.meta, unreadCount: lower(data.meta.unreadCount) },[m
+[32m+[m[32m        });[m
+[32m+[m[32m    }[m
+[32m+[m[32m    queryClient.setQueryData<number>(queryKeys.notifications.unreadCount(), (count) =>[m
+[32m+[m[32m        count === undefined ? count : lower(count),[m
+[32m+[m[32m    );[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * PATCH /notifications/{id}/read. Optimistic: it shows read at once in every list and the[m
+[32m+[m[32m * unread counts go down (only if it was unread); a failure puts everything back and toasts.[m
+[32m+[m[32m * Afterwards the notifications are refetched (an Unread list drops it then).[m
+[32m+[m[32m */[m
+[32m+[m[32mexport function useMarkRead() {[m
+[32m+[m[32m    const queryClient = useQueryClient();[m
+[32m+[m
+[32m+[m[32m    return useMutation({[m
+[32m+[m[32m        mutationFn: (notification: Notification) =>[m
+[32m+[m[32m            unwrap([m
+[32m+[m[32m                api.PATCH('/api/v1/notifications/{notificationId}/read', {[m
+[32m+[m[32m                    params: { path: { notificationId: notification.id } },[m
+[32m+[m[32m                }),[m
+[32m+[m[32m            ),[m
+[32m+[m[32m        onMutate: async (notification) => {[m
+[32m+[m[32m            await queryClient.cancelQueries({ queryKey: queryKeys.notifications.all() });[m
+[32m+[m[32m            const saved = snapshot(queryClient);[m
+[32m+[m[32m            markReadInCache(queryClient, { id: notification.id }, notification.readAt ? 0 : 1);[m
+[32m+[m[32m            return saved;[m
+[32m+[m[32m        },[m
+[32m+[m[32m        onError: (error, _notification, saved) => {[m
+[32m+[m[32m            if (saved) restore(queryClient, saved);[m
+[32m+[m[32m            notifyError(error);[m
+[32m+[m[32m        },[m
+[32m+[m[32m        onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all() }),[m
+[32m+[m[32m    });[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m/** POST /notifications/read-all. Optimistic, like useMarkRead: everything read, counts 0. */[m
+[32m+[m[32mexport function useMarkAllRead() {[m
+[32m+[m[32m    const queryClient = useQueryClient();[m
+[32m+[m
+[32m+[m[32m    return useMutation({[m
+[32m+[m[32m        mutationFn: () => unwrap(api.POST('/api/v1/notifications/read-all')),[m
+[32m+[m[32m        onMutate: async () => {[m
+[32m+[m[32m            await queryClient.cancelQueries({ queryKey: queryKeys.notifications.all() });[m
+[32m+[m[32m            const saved = snapshot(queryClient);[m
+[32m+[m[32m            markReadInCache(queryClient, 'all', 0);[m
+[32m+[m[32m            return saved;[m
+[32m+[m[32m        },[m
+[32m+[m[32m        onError: (error, _variables, saved) => {[m
+[32m+[m[32m            if (saved) restore(queryClient, saved);[m
+[32m+[m[32m            notifyError(error);[m
+[32m+[m[32m        },[m
+[32m+[m[32m        onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all() }),[m
+[32m+[m[32m    });[m
+[32m+[m[32m}[m
