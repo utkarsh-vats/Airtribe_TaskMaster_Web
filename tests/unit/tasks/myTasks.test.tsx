@@ -428,16 +428,35 @@ describe('filters', () => {
         expect(last.get('overdue')).toBe('true');
     });
 
-    it('?assignee in the URL is never sent: no 422, the list loads (counts too)', async () => {
-        const calls = mockApi([task('t1', { title: 'Mine anyway' })]);
-        renderMyTasks('assignee=u-jonas&priority=MEDIUM');
+    // Values the URL parser keeps (parseTaskFilters accepts me, unassigned or a uuid), so it's
+    // useMyTasks / useMyTaskStatusCounts that must keep them out of the request.
+    it.each([
+        ['me', 'me'],
+        ['a user id', '3f2b8c1e-9d4a-4e6b-8a7c-1d2e3f4a5b6c'],
+    ])(
+        '?assignee=%s in the URL is never sent: no 422, the list and its counts load',
+        async (_, value) => {
+            const calls = mockApi([task('t1', { title: 'Mine anyway' })]);
+            renderMyTasks(`assignee=${value}&priority=MEDIUM`);
 
-        expect(await findRow('Mine anyway')).toBeVisible();
-        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-        await vi.waitFor(() => expect(countRequests(calls)).toHaveLength(4));
-        for (const q of calls.mine) expect(q.has('assignee')).toBe(false);
-        expect(listRequests(calls)[0]?.get('priority')).toBe('MEDIUM');
-    });
+            expect(await findRow('Mine anyway')).toBeVisible();
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+            await vi.waitFor(() => expect(countRequests(calls)).toHaveLength(4));
+            await vi.waitFor(() =>
+                expect(
+                    screen.getByRole('radio', { name: /^All/ }).closest('label'),
+                ).toHaveTextContent('All1'),
+            );
+
+            // Every request that went out: the list (limit=25) and the four counts (limit=1).
+            expect(listRequests(calls).length).toBeGreaterThan(0);
+            for (const q of [...listRequests(calls), ...countRequests(calls)]) {
+                expect(q.has('assignee')).toBe(false);
+                expect(q.get('priority')).toBe('MEDIUM');
+            }
+            expect(calls.mine).toHaveLength(listRequests(calls).length + 4);
+        },
+    );
 
     it('the filter row has no Assignee field; Created by offers only Anyone and Me; no members request', async () => {
         openRow();
