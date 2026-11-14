@@ -64,7 +64,8 @@ function fetchMyTasks(query: MyTaskFilters, signal: AbortSignal) {
 }
 
 export function useMyTasks(filters: TaskFilters, { enabled = true }: { enabled?: boolean } = {}) {
-    const query = { ...toQueryParams(filters), page: filters.page, limit: TASKS_PAGE_SIZE };
+    const { assignee: _assignee, ...params } = toQueryParams(filters);
+    const query = { ...params, page: filters.page, limit: TASKS_PAGE_SIZE };
     return useQuery({
         queryKey: queryKeys.tasks.mine(query),
         queryFn: ({ signal }) => fetchMyTasks(query, signal),
@@ -146,6 +147,7 @@ export function useMyTaskStatusCounts(
     const {
         sort: _sort,
         order: _order,
+        assignee: _assignee,
         ...base
     } = toQueryParams({ ...filters, status: undefined });
     const variants: ('ALL' | TaskStatus)[] = ['ALL', ...TASK_STATUSES];

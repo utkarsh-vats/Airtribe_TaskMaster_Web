@@ -415,7 +415,7 @@ describe('optimistic updates', () => {
         await vi.waitFor(() =>
             expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.tasks.all('p1') }),
         );
-        expect(invalidate).toHaveBeenCalledWith({ queryKey: [...queryKeys.tasks.root(), 'mine'] });
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.tasks.mineAll() });
     });
 });
 

@@ -31,6 +31,25 @@ describe('query keys', () => {
         expect(invalidates(queryKeys.tasks.root(), mine)).toBe(true);
     });
 
+    it('mineAll() covers every My tasks query — lists and the status counts — and tasks.all(P) none', () => {
+        const list = queryKeys.tasks.mine({ page: 2, limit: 25, sort: 'dueDate' });
+        // useMyTaskStatusCounts: limit=1, one per status, sort and order dropped.
+        const counts = [
+            queryKeys.tasks.mine({ limit: 1 }),
+            queryKeys.tasks.mine({ status: ['OPEN'], limit: 1 }),
+            queryKeys.tasks.mine({ status: ['COMPLETED'], priority: ['HIGH'], limit: 1 }),
+        ];
+
+        expect(queryKeys.tasks.mineAll()).toEqual([...queryKeys.tasks.root(), 'mine']);
+        for (const key of [list, ...counts]) {
+            expect(invalidates(queryKeys.tasks.mineAll(), key)).toBe(true);
+            expect(invalidates(queryKeys.tasks.all(P), key)).toBe(false);
+        }
+        // …and no project's own queries.
+        expect(invalidates(queryKeys.tasks.mineAll(), queryKeys.tasks.list(P))).toBe(false);
+        expect(invalidates(queryKeys.tasks.mineAll(), queryKeys.tasks.detail(P, 't1'))).toBe(false);
+    });
+
     it('puts the filter object last', () => {
         expect(queryKeys.tasks.list(P, { q: 'hero' }).at(-1)).toEqual({ q: 'hero' });
         expect(queryKeys.notifications.list({ unread: 'true' }).at(-1)).toEqual({ unread: 'true' });

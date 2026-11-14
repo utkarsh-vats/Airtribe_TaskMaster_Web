@@ -291,9 +291,7 @@ describe('success', () => {
         // Deep-linked ?new=1: closing replaces the URL.
         expect(urlReplace).toHaveBeenCalledExactlyOnceWith(PATH);
         expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.tasks.all('p1') });
-        expect(invalidate).toHaveBeenCalledWith({
-            queryKey: [...queryKeys.tasks.root(), 'mine'],
-        });
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.tasks.mineAll() });
 
         const options = vi.mocked(toast.success).mock.calls[0]?.[1] as {
             action: { label: string; onClick: () => void };

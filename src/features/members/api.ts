@@ -14,7 +14,10 @@ import { queryKeys } from '@/lib/query/keys';
 export const MEMBER_GONE_MESSAGE = 'That person is no longer a member.';
 
 /** A project's members (GET /projects/{id}/members — not paginated). Shared by filters, the task panel and the Members tab. */
-export function useProjectMembers(projectId: string) {
+export function useProjectMembers(
+    projectId: string,
+    { enabled = true }: { enabled?: boolean } = {},
+) {
     return useQuery({
         queryKey: queryKeys.members.list(projectId),
         queryFn: ({ signal }) =>
@@ -25,6 +28,7 @@ export function useProjectMembers(projectId: string) {
                 }),
             ),
         staleTime: 5 * 60_000,
+        enabled,
     });
 }
 

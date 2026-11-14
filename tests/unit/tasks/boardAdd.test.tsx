@@ -244,6 +244,7 @@ describe('adding to another column', () => {
         expect(toast.success).not.toHaveBeenCalled();
         expect(urlReplace).toHaveBeenCalledExactlyOnceWith(`${PATH}?view=board`);
         expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.tasks.all('p1') });
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.tasks.mineAll() });
 
         const options = vi.mocked(toast.error).mock.calls[0]?.[1] as {
             action: { label: string; onClick: () => void };

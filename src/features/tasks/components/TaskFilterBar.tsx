@@ -20,7 +20,7 @@ import { TaskSortControls } from './TaskSortControls';
 const PRIORITY_OPTIONS = TASK_PRIORITIES.map((value) => ({ value, label: PRIORITY_LABELS[value] }));
 
 type FilterBarProps = {
-    projectId: string;
+    projectId?: string | undefined;
     filters: TaskFilters;
     onChange: (changes: Partial<TaskFilters>) => void;
     /** Clears every filter and the sort. */
@@ -47,7 +47,9 @@ export function TaskFilterBar({
     id: string;
 }) {
     const [sheetOpen, setSheetOpen] = useState(false);
-    const members = useProjectMembers(props.projectId);
+    const members = useProjectMembers(props.projectId ?? '', {
+        enabled: props.projectId !== undefined,
+    });
     const active = countBarFilters(props.filters);
 
     const nameOf = (userId: string) => {
@@ -131,7 +133,7 @@ function FilterControls({
     stacked = false,
     sort,
 }: FilterBarProps & { stacked?: boolean; sort?: ReactNode }) {
-    const members = useProjectMembers(projectId);
+    const members = useProjectMembers(projectId ?? '', { enabled: projectId !== undefined });
     const overdueId = useId();
     const sorted = [...(members.data ?? [])].sort((a, b) => a.user.name.localeCompare(b.user.name));
     const knownIds = new Set(sorted.map((member) => member.user.id));
@@ -163,22 +165,26 @@ function FilterControls({
                 />
             </div>
 
-            <Field label="Assignee" className={stacked ? 'w-full' : 'w-[170px]'}>
-                <NativeSelect
-                    value={filters.assignee ?? ''}
-                    onChange={(event) => onChange({ assignee: event.target.value || undefined })}
-                >
-                    <option value="">Anyone</option>
-                    <option value="me">Me</option>
-                    <option value="unassigned">Unassigned</option>
-                    {sorted.map((member) => (
-                        <option key={member.user.id} value={member.user.id}>
-                            {member.user.name}
-                        </option>
-                    ))}
-                    {unknownOption(filters.assignee)}
-                </NativeSelect>
-            </Field>
+            {projectId && (
+                <Field label="Assignee" className={stacked ? 'w-full' : 'w-[170px]'}>
+                    <NativeSelect
+                        value={filters.assignee ?? ''}
+                        onChange={(event) =>
+                            onChange({ assignee: event.target.value || undefined })
+                        }
+                    >
+                        <option value="">Anyone</option>
+                        <option value="me">Me</option>
+                        <option value="unassigned">Unassigned</option>
+                        {sorted.map((member) => (
+                            <option key={member.user.id} value={member.user.id}>
+                                {member.user.name}
+                            </option>
+                        ))}
+                        {unknownOption(filters.assignee)}
+                    </NativeSelect>
+                </Field>
+            )}
 
             <Field label="Created by" className={stacked ? 'w-full' : 'w-[170px]'}>
                 <NativeSelect

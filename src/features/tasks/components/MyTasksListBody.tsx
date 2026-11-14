@@ -85,12 +85,10 @@ export function MyTasksListBody() {
     // The project of a task on the current page (rows only exist once the list has loaded).
     const projectOf = (taskId: string) =>
         tasks.data?.items.find((task) => task.id === taskId)?.projectId ?? null;
-    // The task panel (?task) and the New task dialog (?new) never open together.
     // ?task + ?project open the panel (MyTaskPanel needs both).
     const taskHref = (taskId: string) => urlWith({ task: taskId, project: projectOf(taskId) });
     // Pushes a history entry, so Back closes the panel (panelHistory.ts).
     const openTask = (taskId: string) => openTaskPanel(taskHref(taskId), taskId);
-    // New task (always OPEN; My Tasks has no board columns to target).
 
     const toolbar = (
         <div className="flex flex-col gap-3" data-testid="task-toolbar">
@@ -125,7 +123,6 @@ export function MyTasksListBody() {
                 id={filterRowId}
                 open={filtersOpen}
                 animated={filtersAnimated}
-                projectId=""
                 filters={filters}
                 onChange={applyFilters}
                 onClear={clearFilters}
