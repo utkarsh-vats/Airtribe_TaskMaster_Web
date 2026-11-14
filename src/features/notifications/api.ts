@@ -70,6 +70,37 @@ export function useNotifications(filters: NotificationFilters) {
     });
 }
 
+export const LATEST_NOTIFICATIONS_LIMIT = 10;
+/** The header panel reuses its list for this long; opening it after that refetches. */
+const LATEST_STALE_MS = 30_000;
+
+const LATEST_QUERY: NotificationQuery = { page: 1, limit: LATEST_NOTIFICATIONS_LIMIT };
+export const latestNotificationsKey = () => queryKeys.notifications.list(LATEST_QUERY);
+
+/**
+ * The header panel's list: my 10 newest notifications, read or not (page 1, limit 10). The
+ * panel mounts it on open, so opening refetches only when it's stale (30 s, or invalidated —
+ * marking read anywhere does that).
+ */
+export function useLatestNotifications() {
+    return useQuery({
+        queryKey: latestNotificationsKey(),
+        queryFn: ({ signal }) => fetchNotifications(LATEST_QUERY, signal),
+        staleTime: LATEST_STALE_MS,
+    });
+}
+
+/**
+ * Before the panel opens: if the badge's count no longer matches the cached list's (the 60 s
+ * poll saw something new), mark the list stale so opening refetches it.
+ */
+export function staleLatestIfBehind(queryClient: QueryClient) {
+    const unread = queryClient.getQueryData<number>(queryKeys.notifications.unreadCount());
+    const latest = queryClient.getQueryData<NotificationPage>(latestNotificationsKey());
+    if (unread === undefined || !latest || latest.meta.unreadCount === unread) return;
+    void queryClient.invalidateQueries({ queryKey: latestNotificationsKey(), exact: true });
+}
+
 // ── marking read (optimistic) ────────────────────────────────────────────────────────
 
 type Snapshot = [QueryKey, unknown][];

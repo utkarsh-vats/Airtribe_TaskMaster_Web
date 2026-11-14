@@ -1,10 +1,8 @@
 'use client';
 
 import { clsx } from 'clsx';
-import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 
-import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -12,14 +10,12 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Segmented } from '@/components/ui/Segmented';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { errorMessage } from '@/lib/api/messages';
-import type { Notification } from '@/lib/api/types';
-import { fullDateTime, relativeTime } from '@/lib/format/dates';
 import { shallowUrl } from '@/lib/hooks/shallowUrl';
 import { queryView } from '@/lib/query/view';
-import { isPlainClick } from '@/lib/react/plainClick';
 
-import { useMarkAllRead, useMarkRead, useNotifications, useUnreadCount } from '../api';
-import { notificationActor, notificationSentence } from '../sentence';
+import { useMarkAllRead, useNotifications, useUnreadCount } from '../api';
+
+import { NotificationRow } from './NotificationRow';
 
 type Filter = 'all' | 'unread';
 
@@ -158,75 +154,5 @@ export function NotificationsView() {
             />
             {body}
         </div>
-    );
-}
-
-/**
- * Unread dot, the actor's avatar, the sentence (names bold) and when. The whole row is a link:
- * a plain click marks it read (fire and forget) and goes there; a modified click (new tab) just
- * follows the link.
- */
-function NotificationRow({ notification }: { notification: Notification }) {
-    const router = useRouter();
-    const markRead = useMarkRead();
-    const { parts, href, text } = notificationSentence(notification);
-    const actor = notificationActor(notification) ?? 'Someone';
-    const isUnread = !notification.readAt;
-
-    return (
-        <li className="border-b border-divider" data-unread={isUnread || undefined}>
-            <Link
-                href={href}
-                aria-label={`${isUnread ? 'Unread: ' : ''}${text}`}
-                onClick={(event) => {
-                    if (!isPlainClick(event)) return;
-                    event.preventDefault();
-                    if (isUnread) markRead.mutate(notification);
-                    router.push(href);
-                }}
-                className="grid grid-cols-[10px_32px_minmax(0,1fr)] items-start gap-3 px-2 py-3 text-text no-underline hover:bg-[color-mix(in_srgb,var(--color-text)_4%,transparent)] hover:text-text focus-visible:[outline-offset:-2px] md:grid-cols-[10px_32px_minmax(0,1fr)_auto] md:items-center"
-            >
-                <span
-                    aria-hidden
-                    data-testid="unread-dot"
-                    className={clsx(
-                        'mt-[11px] size-2 rounded-full md:mt-0',
-                        isUnread ? 'bg-accent' : 'bg-transparent',
-                    )}
-                />
-                <Avatar name={actor} />
-                <span
-                    className={clsx(
-                        'min-w-0 text-sm break-words',
-                        !isUnread && 'text-[color-mix(in_srgb,var(--color-text)_75%,transparent)]',
-                    )}
-                >
-                    {parts.map((part, i) =>
-                        part.strong ? (
-                            <strong key={i} className="font-semibold">
-                                {part.text}
-                            </strong>
-                        ) : (
-                            <span key={i}>{part.text}</span>
-                        ),
-                    )}
-                    {/* Below 820px the time sits under the sentence. */}
-                    <time
-                        dateTime={notification.createdAt}
-                        title={fullDateTime(notification.createdAt)}
-                        className="text-muted mt-1 block text-[12px] md:hidden"
-                    >
-                        {relativeTime(notification.createdAt)}
-                    </time>
-                </span>
-                <time
-                    dateTime={notification.createdAt}
-                    title={fullDateTime(notification.createdAt)}
-                    className="text-muted hidden text-[12px] whitespace-nowrap md:block"
-                >
-                    {relativeTime(notification.createdAt)}
-                </time>
-            </Link>
-        </li>
     );
 }
