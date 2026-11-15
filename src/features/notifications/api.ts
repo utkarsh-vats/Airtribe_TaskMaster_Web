@@ -8,11 +8,13 @@ import {
     type QueryClient,
     type QueryKey,
 } from '@tanstack/react-query';
+import { useSyncExternalStore } from 'react';
 
 import { api, unwrap, unwrapPage } from '@/lib/api/client';
 import { notifyError } from '@/lib/api/notify';
 import type { Notification } from '@/lib/api/types';
-import { queryKeys } from '@/lib/query/keys';
+import { queryKeys, type NotificationListFilters } from '@/lib/query/keys';
+import { streamState } from '@/lib/realtime/notificationStream';
 
 const UNREAD_POLL_MS = 60_000;
 export const NOTIFICATIONS_PAGE_SIZE = 20;
@@ -20,10 +22,16 @@ export const NOTIFICATIONS_PAGE_SIZE = 20;
 /**
  * Unread notification count for the header badge: GET /notifications?unread=true&limit=1,
  * reading meta.unreadCount. Polls every 60 s while the tab is visible (TanStack pauses the
- * interval in background tabs); step 12c adds live updates over SSE. Marking read updates it
- * in place (useMarkRead / useMarkAllRead).
+ * interval in background tabs) and the live stream isn't open — while it is, new
+ * notifications arrive over it (addNotificationToCache). Marking read updates it in place
+ * (useMarkRead / useMarkAllRead).
  */
 export function useUnreadCount() {
+    const live = useSyncExternalStore(
+        streamState.subscribe,
+        () => streamState.get() === 'open',
+        () => false,
+    );
     return useQuery({
         queryKey: queryKeys.notifications.unreadCount(),
         queryFn: async ({ signal }) => {
@@ -35,7 +43,7 @@ export function useUnreadCount() {
             );
             return meta.unreadCount;
         },
-        refetchInterval: UNREAD_POLL_MS,
+        refetchInterval: live ? false : UNREAD_POLL_MS,
         refetchIntervalInBackground: false,
     });
 }
@@ -101,6 +109,61 @@ export function staleLatestIfBehind(queryClient: QueryClient) {
     void queryClient.invalidateQueries({ queryKey: latestNotificationsKey(), exact: true });
 }
 
+// ── live notifications ───────────────────────────────────────────────────────────────
+
+const listsOf = (queryClient: QueryClient) =>
+    queryClient.getQueriesData({ queryKey: [...queryKeys.notifications.all(), 'list'] });
+
+/** The cached copy of a notification (the newest state, e.g. read since), if any list has it. */
+export function cachedNotification(queryClient: QueryClient, id: string): Notification | null {
+    for (const [, data] of listsOf(queryClient)) {
+        const found = isPage(data) ? data.items.find((item) => item.id === id) : undefined;
+        if (found) return found;
+    }
+    return null;
+}
+
+/**
+ * A notification from the live stream. Returns false (and changes nothing) if a cached list
+ * already has it. Otherwise: prepended to every cached page 1 it belongs on — the panel's
+ * latest, the page's All and (unread) Unread — trimmed to the page size, with meta.total;
+ * meta.unreadCount and the header's count go up by one (for an unread one) everywhere; later
+ * pages keep their rows but go stale, so they refetch when visited.
+ */
+export function addNotificationToCache(queryClient: QueryClient, notification: Notification) {
+    if (cachedNotification(queryClient, notification.id)) return false;
+    const unread = !notification.readAt;
+    for (const [key, data] of listsOf(queryClient)) {
+        if (!isPage(data)) continue;
+        const filters = (key[2] ?? {}) as NotificationListFilters;
+        const meta = { ...data.meta, unreadCount: data.meta.unreadCount + (unread ? 1 : 0) };
+        const belongs =
+            filters.unread === undefined || filters.unread === (unread ? 'true' : 'false');
+        if ((filters.page ?? 1) !== 1 || !belongs) {
+            queryClient.setQueryData(key, { ...data, meta });
+            if (belongs)
+                void queryClient.invalidateQueries({
+                    queryKey: key,
+                    exact: true,
+                    refetchType: 'none',
+                });
+            continue;
+        }
+        const total = data.meta.total + 1;
+        queryClient.setQueryData(key, {
+            ...data,
+            items: [notification, ...data.items].slice(0, data.meta.limit),
+            meta: { ...meta, total, totalPages: Math.ceil(total / data.meta.limit) },
+        });
+    }
+    if (unread) {
+        queryClient.setQueryData<number>(queryKeys.notifications.unreadCount(), (count) =>
+            count === undefined ? count : count + 1,
+        );
+    }
+    return true;
+}
+
 // ── marking read (optimistic) ────────────────────────────────────────────────────────
 
 type Snapshot = [QueryKey, unknown][];
@@ -124,9 +187,7 @@ function restore(queryClient: QueryClient, saved: Snapshot) {
 function markReadInCache(queryClient: QueryClient, which: { id: string } | 'all', fewer: number) {
     const now = new Date().toISOString();
     const lower = (count: number) => (which === 'all' ? 0 : Math.max(0, count - fewer));
-    for (const [key, data] of queryClient.getQueriesData({
-        queryKey: [...queryKeys.notifications.all(), 'list'],
-    })) {
+    for (const [key, data] of listsOf(queryClient)) {
         if (!isPage(data)) continue;
         queryClient.setQueryData(key, {
             ...data,
