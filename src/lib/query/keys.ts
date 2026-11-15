@@ -81,7 +81,9 @@ export const queryKeys = {
     },
 
     comments: {
-        all: (projectId: string) => ['comments', projectId] as const,
+        /** Every comments query of every project (the live stream's reconnect catch-up). */
+        root: () => ['comments'] as const,
+        all: (projectId: string) => [...queryKeys.comments.root(), projectId] as const,
         list: (projectId: string, taskId: TaskScope, filters?: CommentListFilters) =>
             [
                 ...queryKeys.comments.all(projectId),

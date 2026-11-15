@@ -7,17 +7,18 @@ import { toast } from 'sonner';
 
 import type { Notification } from '@/lib/api/types';
 import { useSession } from '@/lib/auth/SessionProvider';
-import { queryKeys } from '@/lib/query/keys';
 import { startNotificationStream } from '@/lib/realtime/notificationStream';
 
 import { addNotificationToCache, cachedNotification, useMarkRead } from './api';
+import { catchUpAfterReconnect, invalidateForNotification } from './invalidate';
 import { notificationSentence } from './sentence';
 
 /**
  * The live notification stream for the signed-in user (DESIGN.md §9): started on sign-in,
  * aborted on sign-out (here or in another tab — both end the session in the store). Each new
  * notification goes into the cache (badge, panel, page) and shows a toast with Open, unless
- * the cache (or this stream) already had it. A reconnect refetches the notifications to catch up.
+ * the cache (or this stream) already had it, and what it's about (task, comments, my
+ * invitations) is refetched. A reconnect refetches all of that to catch up.
  */
 export function useNotificationStream() {
     const session = useSession();
@@ -28,6 +29,7 @@ export function useNotificationStream() {
 
     const onNotification = useEffectEvent((notification: Notification) => {
         if (!addNotificationToCache(queryClient, notification)) return;
+        invalidateForNotification(queryClient, notification);
         const { text, href } = notificationSentence(notification);
         toast(text, {
             id: `notification-${notification.id}`,
@@ -53,8 +55,7 @@ export function useNotificationStream() {
                 seen.add(notification.id);
                 onNotification(notification);
             },
-            onReconnected: () =>
-                void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all() }),
+            onReconnected: () => catchUpAfterReconnect(queryClient),
         });
     }, [userId, queryClient]);
 }
