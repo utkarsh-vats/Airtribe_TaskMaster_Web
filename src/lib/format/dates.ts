@@ -50,6 +50,13 @@ export function shortDate(iso: string, now: Date = new Date()): string {
     );
 }
 
+const monthYearFormat = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
+
+/** "October 2026" ("Member since …"). */
+export function monthYear(iso: string): string {
+    return monthYearFormat.format(new Date(iso));
+}
+
 /** Whole calendar days from `now`'s day to `date`'s (local time): 1 = tomorrow, -1 = yesterday. */
 const calendarDays = (date: Date, now: Date) => {
     const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());

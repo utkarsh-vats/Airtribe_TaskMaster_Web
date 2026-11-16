@@ -9,7 +9,7 @@ type AvatarProps = {
     name: string;
     /** Image URL; falls back to initials if it's missing or fails to load. */
     src?: string | null;
-    size?: 'xs' | 'sm' | 'md';
+    size?: 'xs' | 'sm' | 'md' | 'lg';
     className?: string;
 };
 

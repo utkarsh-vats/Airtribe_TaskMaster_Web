@@ -322,6 +322,11 @@ a.btn-ghost:hover {
     height: 32px;
     font-size: 11px;
 }
+.avatar-lg {
+    width: 64px;
+    height: 64px;
+    font-size: 20px;
+}
 .avatar img {
     width: 100%;
     height: 100%;

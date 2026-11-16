@@ -51,6 +51,11 @@ export const sessionStore = {
             expiresAt: now + payload.expiresIn * 1000,
         });
     },
+    /** A newer copy of the signed-in user (e.g. a saved profile); the token is kept. */
+    setUser(user: User) {
+        if (state.status !== 'authenticated' || state.user.id !== user.id) return;
+        set({ ...state, user });
+    },
     setUnauthenticated() {
         set(SIGNED_OUT);
     },
