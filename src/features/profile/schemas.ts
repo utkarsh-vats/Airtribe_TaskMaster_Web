@@ -49,3 +49,39 @@ export function profileChanges(user: User, values: ProfileFormValues): Partial<P
     if (values.avatarUrl !== user.avatarUrl) changes.avatarUrl = values.avatarUrl;
     return changes;
 }
+
+/**
+ * Change password, mirroring PATCH /users/me/password (backend users.schemas.ts): current
+ * 1–128 (only checked against the stored hash), new 8–128 and different from the current one;
+ * plus a confirmation that must match. Passwords aren't trimmed.
+ */
+export const passwordChangeSchema = z
+    .object({
+        currentPassword: z
+            .string()
+            .min(1, 'Enter your current password.')
+            .max(128, 'Password must be 128 characters or fewer.'),
+        newPassword: z
+            .string()
+            .min(8, 'Use at least 8 characters.')
+            .max(128, 'Password must be 128 characters or fewer.'),
+        confirmPassword: z.string().min(1, 'Confirm your new password.'),
+    })
+    .superRefine(({ currentPassword, newPassword, confirmPassword }, ctx) => {
+        if (newPassword && newPassword === currentPassword) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['newPassword'],
+                message: 'Choose a password different from your current one.',
+            });
+        }
+        if (confirmPassword && confirmPassword !== newPassword) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['confirmPassword'],
+                message: "Passwords don't match.",
+            });
+        }
+    });
+
+export type PasswordChangeValues = z.infer<typeof passwordChangeSchema>;

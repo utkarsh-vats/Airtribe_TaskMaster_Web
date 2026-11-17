@@ -355,6 +355,15 @@ describe('POST /api/auth/logout', () => {
         expect(refreshCookie(response)).toMatch(/Max-Age=0/);
     });
 
+    it('clears the cookie even when the backend answers 401 (e.g. revoked by a password change)', async () => {
+        server.use(http.post(api('/auth/logout'), () => apiError(401, 'UNAUTHORIZED')));
+
+        const response = await logout(request('logout', { cookie: REFRESH_TOKEN }));
+
+        expect(response.status).toBe(204);
+        expect(refreshCookie(response)).toMatch(/Max-Age=0/);
+    });
+
     it('does not call the API without a cookie', async () => {
         // No handler: an API call would fail the test (onUnhandledFrame: 'error').
         const response = await logout(request('logout'));

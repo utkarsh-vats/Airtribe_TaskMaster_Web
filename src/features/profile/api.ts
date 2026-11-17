@@ -41,3 +41,15 @@ export function useUpdateProfile() {
         },
     });
 }
+
+/**
+ * PATCH /users/me/password. The API ends every session on success (it revokes all refresh
+ * tokens), so the caller signs this tab out. A wrong current password is a 400
+ * INVALID_CURRENT_PASSWORD — not a 401, so the client's session handling never sees it.
+ */
+export function useChangePassword() {
+    return useMutation({
+        mutationFn: (body: { currentPassword: string; newPassword: string }) =>
+            unwrap(api.PATCH('/api/v1/users/me/password', { body })),
+    });
+}

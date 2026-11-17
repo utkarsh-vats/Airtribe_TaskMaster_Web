@@ -29,6 +29,8 @@ import {
     type ProfileFormValues,
 } from '../schemas';
 
+import { ChangePasswordForm } from './ChangePasswordForm';
+
 const FIELDS = ['name', 'bio', 'avatarUrl'] as const;
 
 export const PROFILE_UPDATED_MESSAGE = 'Profile updated';
@@ -36,7 +38,7 @@ export const PROFILE_UPDATED_MESSAGE = 'Profile updated';
 /**
  * /dashboard/profile (DESIGN.md §6): a card with my avatar, name, email and "Member since",
  * then the profile form — name, bio and avatar URL (PATCH /users/me); email is read-only (the
- * API can't change it). Change password is 13b.
+ * API can't change it) — and below it Change password.
  */
 export function ProfileView() {
     const me = useMe();
@@ -71,6 +73,7 @@ export function ProfileView() {
             <>
                 <ProfileCard user={view.data} />
                 <ProfileForm user={view.data} />
+                <ChangePasswordForm />
             </>
         );
     }
